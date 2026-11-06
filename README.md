@@ -59,3 +59,7 @@ bash scripts/create-issues.sh
 ```
 
 O script verifica títulos já existentes antes de criar. Nenhuma atribuição a integrantes é feita automaticamente.
+
+## Git Flow
+
+Usamos `main` para versões estáveis, `develop` para integração e branches `feature/*`, `release/*` e `hotfix/*` para o trabalho da equipe. Após clonar, execute `bash scripts/setup-git-flow.sh`. Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para criar uma tarefa, abrir PR e publicar versões.
