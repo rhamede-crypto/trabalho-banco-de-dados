@@ -10,7 +10,7 @@ bash scripts/setup-git-flow.sh
 git switch develop
 ```
 
-As branches permanentes são `main` (versões estáveis) e `develop` (integração e branch padrão do GitHub). A configuração está em `.gitflow`; cada integrante deve executar o script, pois `.git/config` é local e não acompanha clones. O script pode ser executado novamente e não troca sua branch nem altera arquivos de trabalho.
+As branches permanentes são `main` (versões estáveis) e `develop` (integração e destino dos PRs de funcionalidades). A configuração está em `.gitflow`; cada integrante deve executar o script, pois `.git/config` é local e não acompanha clones. O script pode ser executado novamente e não troca sua branch nem altera arquivos de trabalho.
 
 Não usar commits diretos nas branches permanentes no desenvolvimento diário. Criar uma branch por tarefa e abrir pull request. Usar merge commit no GitHub para manter a história das integrações (`Create a merge commit`). As orientações são convenções da equipe; não há bloqueio de push direto configurado.
 
@@ -20,6 +20,12 @@ Não usar commits diretos nas branches permanentes no desenvolvimento diário. C
 | Correção em desenvolvimento | `develop` | `develop` | `bugfix/validacao-cadastro` |
 | Preparação de versão | `develop` | `main` e depois `develop` | `release/1.0.0` |
 | Correção urgente publicada | `main` | `main` e depois `develop` | `hotfix/1.0.1` |
+
+## Configuração no GitHub
+
+A branch `develop` já está publicada. Um administrador deve defini-la como padrão nas configurações do repositório (Default branch). Em Pull Requests, manter `Allow merge commits` habilitado. A credencial usada na configuração inicial permitiu publicar branches, mas a API recusou alterações dessas configurações com HTTP 403; elas precisam ser conferidas pelo administrador.
+
+Até mudar a branch padrão, selecionar `develop` manualmente como destino dos PRs de funcionalidades. O clone pode abrir em `main`; executar o script de configuração e depois `git switch develop` como mostrado acima.
 
 ## Fazer uma tarefa
 
