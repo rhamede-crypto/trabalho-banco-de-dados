@@ -18,6 +18,25 @@ A API usa a porta 3000 por padrão (`PORT` pode alterá-la). `npm start` inicia 
 
 `db:setup` cria a extensão, tabela e índices de forma repetível; não apaga dados. A conta de instalação precisa poder criar a extensão. Em produção, use uma conta de aplicação com permissões restritas. Evite editar a tabela manualmente; registre mudanças futuras como migrações.
 
+## Frontend (mapa Leaflet)
+
+Com o servidor em execução, abra `http://localhost:3000/` para carregar o mapa. A interface:
+
+- solicita geolocalização no navegador e usa fallback para Fortaleza (CE) quando não disponível;
+- consulta apenas o retângulo visível em `GET /api/places` no carregamento e ao mover/zoom;
+- informa estado de carregamento, ausência de resultados, falha e resposta truncada.
+
+### Validação manual registrada
+
+Para validar com dois locais reais (Fortaleza):
+
+```sh
+curl -X POST http://localhost:3000/api/places -H 'Content-Type: application/json' -d '{"name":"Biblioteca Pública Estadual do Ceará","description":"Av. Presidente Castelo Branco, 255","latitude":-3.71657,"longitude":-38.53604}'
+curl -X POST http://localhost:3000/api/places -H 'Content-Type: application/json' -d '{"name":"Biblioteca da UFC (Campus do Pici)","description":"Bloco 308, Campus do Pici","latitude":-3.74559,"longitude":-38.57466}'
+```
+
+Depois, abra o mapa em `http://localhost:3000/`, permita geolocalização (ou use fallback), aproxime/afaste e confirme que os marcadores aparecem apenas quando os pontos estão dentro da área visível.
+
 ## Contrato da API
 
 `place` representa um local de estudo. Respostas usam `id` como string, `name`, `description`, `latitude` e `longitude`.
