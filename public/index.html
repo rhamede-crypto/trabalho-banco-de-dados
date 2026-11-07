@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Locais de Estudo - Mapa Colaborativo</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      color: #1f2937;
+      background: #f9fafb;
+    }
+
+    #sidebar {
+      width: 420px;
+      min-width: 320px;
+      background: #ffffff;
+      border-right: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem;
+      gap: 1.25rem;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    }
+
+    #map {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+    }
+
+    .panel {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #111827;
+    }
+
+    label {
+      display: block;
+      font-size: 0.825rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #374151;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-bottom: 0.85rem;
+      background: #fff;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 75px;
+    }
+
+    .coords-badge {
+      font-size: 0.8rem;
+      color: #4b5563;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      padding: 0.55rem;
+      border-radius: 6px;
+      margin-bottom: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      cursor: pointer;
+      padding: 0.55rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background-color 0.15s ease-in-out;
+    }
+
+    .btn-primary { background: #2563eb; color: #ffffff; flex: 1; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .btn-secondary:hover { background: #e5e7eb; }
+
+    .btn-danger { background: #ef4444; color: #ffffff; }
+    .btn-danger:hover { background: #dc2626; }
+
+    .search-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    #search-results {
+      list-style: none;
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      display: none;
+      margin-top: 0.65rem;
+    }
+
+    #search-results li {
+      padding: 0.55rem 0.75rem;
+      font-size: 0.825rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f3f4f6;
+      line-height: 1.35;
+    }
+
+    #search-results li:hover {
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    #search-results li:last-child {
+      border-bottom: none;
+    }
+
+    #status-alert {
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      display: none;
+      line-height: 1.4;
+    }
+
+    #status-alert.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    #status-alert.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    #status-alert.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+    .attribution-text {
+      font-size: 0.725rem;
+      color: #9ca3af;
+      margin-top: 0.4rem;
+    }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column-reverse; }
+      #sidebar { width: 100%; height: 50vh; min-width: auto; }
+      #map { width: 100%; height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside id="sidebar">
+    <div id="status-alert" role="status" aria-live="polite"></div>
+
+    <section class="panel" aria-labelledby="search-title">
+      <h2 id="search-title">Buscar Localidade ou Endereço</h2>
+      <form id="search-form">
+        <div class="search-row">
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Ex: Biblioteca Municipal ou Campus IFPB..."
+            autocomplete="off"
+          />
+          <button type="submit" id="search-btn" class="btn-secondary">Buscar</button>
+        </div>
+      </form>
+      <ul id="search-results"></ul>
+      <p class="attribution-text">Geocodificação cortesia OpenStreetMap / Nominatim</p>
+    </section>
+
+    <section class="panel" aria-labelledby="form-title">
+      <h2 id="form-title">Cadastrar Local de Estudo</h2>
+      <form id="place-form">
+        <label for="place-name">Nome do local (máx. 120 caracteres)*</label>
+        <input
+          type="text"
+          id="place-name"
+          maxlength="120"
+          required
+          placeholder="Ex: Sala de Estudos 24h"
+        />
+
+        <label for="place-desc">Descrição (máx. 2000 caracteres)</label>
+        <textarea
+          id="place-desc"
+          maxlength="2000"
+          placeholder="Tomadas disponíveis, ar-condicionado, Wi-Fi institucional..."
+        ></textarea>
+
+        <div class="coords-badge" id="coords-display">
+          Nenhum ponto marcado. Clique no mapa ou busque um endereço acima para posicionar.
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" id="save-btn" class="btn-primary" disabled>Cadastrar</button>
+          <button type="button" id="cancel-edit-btn" class="btn-secondary" style="display: none;">Cancelar</button>
+        </div>
+      </form>
+    </section>
+  </aside>
+
+  <main id="map" aria-label="Mapa de locais de estudo"></main>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="app.js"></script>
+</body>
+</html>
