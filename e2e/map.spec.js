@@ -262,3 +262,16 @@ test('busca trata serviço indisponível e nova tentativa',async({page})=>{
   await page.getByRole('button',{name:'Buscar endereço',exact:true}).click();
   await expect(page.locator('#search-status')).not.toHaveText('Buscando endereços…');
 });
+
+test('popup do marcador permite iniciar edição e exclusão', async ({page}) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:/Biblioteca Central/}).click();
+  await page.getByRole('button',{name:'Editar ponto',exact:true}).click();
+  await expect(page.getByLabel('Nome do local')).toHaveValue('Biblioteca Central');
+  await page.getByRole('button',{name:'Cancelar',exact:true}).click();
+  await page.getByRole('button',{name:/Biblioteca Central/}).click();
+  page.once('dialog',dialog=>dialog.dismiss());
+  await expect(page.getByRole('button',{name:'Excluir ponto',exact:true})).toHaveCount(1);
+  await page.getByRole('button',{name:'Excluir ponto',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Excluir local',exact:true})).toBeVisible();
+});

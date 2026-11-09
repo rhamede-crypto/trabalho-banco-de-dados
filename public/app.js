@@ -45,9 +45,21 @@ function popup(place) {
   description.textContent =
     place.description || "Um novo lugar para suas ideias.";
   content.append(title, description);
+  const actions = document.createElement("div");
+  const edit = document.createElement("button"), remove = document.createElement("button");
+  edit.type = remove.type = "button";
+  edit.className = remove.className = "text-button";
+  edit.textContent = "Editar ponto";remove.textContent = "Excluir ponto";
+  edit.addEventListener("click", () => openEditor(place));
+  remove.addEventListener("click", () => {
+    if(saving) return;
+    openEditor(place);$("delete-place").click();
+  });
+  actions.className = "popup-actions";actions.append(edit,remove);content.append(actions);
   return content;
 }
 function renderPlaces(places) {
+  map.closePopup();
   markers.clearLayers();
   $("places").replaceChildren();
   for (const place of places) {
@@ -55,7 +67,7 @@ function renderPlaces(places) {
       icon,
       title: place.name,
     })
-      .bindPopup(popup(place))
+      .bindPopup(popup(place), {autoPan:false})
       .addTo(markers);
     marker.on("click", () => (activePlace = place.id));
     if (activePlace === place.id) marker.openPopup();

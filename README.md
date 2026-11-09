@@ -94,7 +94,7 @@ Usamos `main` para versões estáveis, `develop` para integração e branches `f
 - Mensagens para falhas de rede/banco, ausência de pontos e sucesso no cadastro. Não há dados simulados nem salvamento local no produto; a persistência depende de DATABASE_URL.
 - Layout para desktop e celular; geolocalização em domínio publicado exige HTTPS.
 
-Edição/exclusão pela interface, geocodificação, interface de busca por raio e publicação permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
+Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. Interface de busca por raio e publicação permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
 
 ## Validar
 

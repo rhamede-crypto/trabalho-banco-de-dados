@@ -593,3 +593,5 @@ textarea {
     transition: none !important;
   }
 }
+
+.popup-actions { display: flex; gap: 16px; margin-top: 10px; }

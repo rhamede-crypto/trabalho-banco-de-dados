@@ -1,9 +1,9 @@
 # Completar edição, exclusão e busca por endereço na interface
 
 ## Estado atual
-O cadastro inicial já tem formulário com nome e descrição, seleção por clique/centro do mapa, ajuste do marcador por arraste e persistência via POST. Consulte o PR da branch feature/1-mapa-cadastro-inicial, destinada a develop. Não reimplementar essa parte; revisar a interface existente em public/.
+Após integrar os PRs #7 e #9, edição, exclusão e busca de endereço também estão disponíveis em develop. O cadastro inicial já tem formulário com nome e descrição, seleção por clique/centro do mapa, ajuste do marcador por arraste e persistência via POST. Consulte o PR da branch feature/1-mapa-cadastro-inicial, destinada a develop. Não reimplementar essa parte; revisar a interface existente em public/.
 
-## Tarefas restantes
+## Escopo integrado nos PRs #7 e #9
 - Permitir editar nome, descrição e localização de um local cadastrado, integrando PUT /api/places/:id.
 - Integrar DELETE /api/places/:id, com confirmação de exclusão.
 - Atualizar lista/marcadores após sucesso e preservar formulário em falhas.
