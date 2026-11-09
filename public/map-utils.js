@@ -1,12 +1,9 @@
+import { viewportParams } from './api.js';
 const DECIMALS = 6;
 
 export function buildViewportQuery(bounds) {
-  const params = new URLSearchParams({
-    west: bounds.getWest().toFixed(DECIMALS),
-    east: bounds.getEast().toFixed(DECIMALS),
-    south: bounds.getSouth().toFixed(DECIMALS),
-    north: bounds.getNorth().toFixed(DECIMALS)
-  });
+  const params = viewportParams(bounds);
+  for (const [key, value] of params) params.set(key, Number(value).toFixed(DECIMALS));
 
   return `/api/places?${params.toString()}`;
 }
@@ -20,7 +17,9 @@ export function createRequestLock() {
       currentController?.abort();
       currentController = new AbortController();
       currentRequestId += 1;
+      const controller = currentController;
       return {
+        abort: () => controller.abort(),
         id: currentRequestId,
         signal: currentController.signal
       };
