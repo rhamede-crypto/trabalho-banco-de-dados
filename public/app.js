@@ -1,4 +1,6 @@
-import { request, viewportParams } from "./api.js";
+import { request } from "./api.js";
+import { buildViewportQuery, createRequestLock, geolocationMessage } from "./map-utils.js";
+const viewportRequests = createRequestLock();
 const $ = (id) => document.getElementById(id);
 const fallback = [-3.7319, -38.5267];
 const map = L.map("map", { zoomControl: false, worldCopyJump: true }).setView(
@@ -24,9 +26,7 @@ const icon = L.divIcon({
   iconAnchor: [17, 40],
   popupAnchor: [0, -35],
 });
-let controller,
-  loadVersion = 0,
-  editing = false,
+let editing = false,
   saving = false,
   activePlace,
   selection,
@@ -87,26 +87,23 @@ function renderPlaces(places) {
   $("empty-state").hidden = places.length !== 0;
 }
 async function loadPlaces() {
-  controller?.abort();
-  controller = new AbortController();
-  const current = controller,
-    version = ++loadVersion;
+  const current = viewportRequests.next(), version = current.id;
   $("list-status").textContent = "Buscando locais nesta área…";
   $("retry").hidden = true;
   $("empty-state").hidden = true;
   const timeout = setTimeout(() => current.abort(), 12000);
   try {
     const data = await request(
-      `/api/places?${viewportParams(map.getBounds())}`,
+      buildViewportQuery(map.getBounds()),
       { signal: current.signal },
     );
-    if (version !== loadVersion) return;
+    if (!viewportRequests.isCurrent(version)) return;
     renderPlaces(data.places);
     $("list-status").textContent = data.truncated
       ? "Há mais de 500 locais nesta área. Aproxime o mapa para ver todos."
       : `${data.places.length === 1 ? "1 local encontrado" : `${data.places.length} locais encontrados`}. Atualizado ao mover o mapa.`;
   } catch (error) {
-    if (version !== loadVersion) return;
+    if (!viewportRequests.isCurrent(version)) return;
     markers.clearLayers();
     $("places").replaceChildren();
     $("result-count").textContent = "—";
@@ -151,7 +148,7 @@ function locate() {
       const reason =
         error.code === 1
           ? "Permissão de localização negada."
-          : "Não foi possível obter sua localização.";
+          : geolocationMessage(error.code, window.isSecureContext);
       $("location-status").textContent =
         `${reason} Explore o mapa manualmente. A posição inicial alternativa é Fortaleza.`;
       $("locate").disabled = false;
