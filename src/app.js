@@ -44,6 +44,7 @@ export function createApp(db, configured = true) {
     const result = await db.query('DELETE FROM places WHERE id=$1',[id]);
     res.status(result.rowCount ? 204 : 404).send(result.rowCount ? undefined : {error:'Lugar não encontrado.'});
   });
+  app.use('/vendor/leaflet', express.static(fileURLToPath(new URL('../node_modules/leaflet/dist',import.meta.url))));
   app.use(express.static(fileURLToPath(new URL('../public',import.meta.url))));
   app.use('/api', (req,res) => res.status(404).json({error:'Rota não encontrada.'}));
   app.use((err,req,res,next) => {

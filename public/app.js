@@ -1,344 +1,351 @@
-let map;
-let placesLayer;
-let selectionMarker = null;
-let currentEditingId = null;
-let selectedCoordinates = null;
-let activeViewportController = null;
+import { createGeocodeClient } from "./geocode.js";
+const geocoder = createGeocodeClient();
+let editingId = null, searchVersion = 0;
+import { request } from "./api.js";
+import { buildViewportQuery, createRequestLock, geolocationMessage } from "./map-utils.js";
+const viewportRequests = createRequestLock();
+const $ = (id) => document.getElementById(id);
+const fallback = [-3.7319, -38.5267];
+const map = L.map("map", { zoomControl: false, worldCopyJump: true }).setView(
+  fallback,
+  13,
+);
+L.control.zoom({ position: "topright" }).addTo(map);
+const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
+tiles.on("tileerror", () => {
+  $("tile-status").hidden = false;
+  $("tile-status").textContent =
+    "O mapa base não carregou. Verifique sua conexão; os locais continuam disponíveis na lista.";
+});
+const markers = L.layerGroup().addTo(map);
+const icon = L.divIcon({
+  className: "study-marker",
+  html: '<div class="marker-pin"><span>▤</span></div>',
+  iconSize: [34, 42],
+  iconAnchor: [17, 40],
+  popupAnchor: [0, -35],
+});
+let editing = false,
+  saving = false,
+  activePlace,
+  selection,
+  selectedMarker,
+  userMarker,
+  toastTimer;
 
-const DEFAULT_COORDS = { lat: -6.8885, lng: -38.5614, zoom: 14 };
-
-const statusAlert = document.getElementById('status-alert');
-const formTitle = document.getElementById('form-title');
-const placeForm = document.getElementById('place-form');
-const nameInput = document.getElementById('place-name');
-const descInput = document.getElementById('place-desc');
-const coordsDisplay = document.getElementById('coords-display');
-const saveBtn = document.getElementById('save-btn');
-const cancelEditBtn = document.getElementById('cancel-edit-btn');
-const searchForm = document.getElementById('search-form');
-const searchInput = document.getElementById('search-input');
-const searchBtn = document.getElementById('search-btn');
-const searchResults = document.getElementById('search-results');
-
-function setFeedback(message, type = 'info') {
-  statusAlert.textContent = message;
-  statusAlert.className = type;
-  statusAlert.style.display = 'block';
+function popup(place) {
+  const content = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = place.name;
+  const description = document.createElement("p");
+  description.textContent =
+    place.description || "Um novo lugar para suas ideias.";
+  content.append(title, description);
+  const actions = document.createElement("div");
+  const edit = document.createElement("button"), remove = document.createElement("button");
+  edit.type = remove.type = "button";
+  edit.className = remove.className = "text-button";
+  edit.textContent = "Editar ponto";remove.textContent = "Excluir ponto";
+  edit.addEventListener("click", () => openEditor(place));
+  remove.addEventListener("click", () => {
+    if(saving) return;
+    openEditor(place);$("delete-place").click();
+  });
+  actions.className = "popup-actions";actions.append(edit,remove);content.append(actions);
+  return content;
 }
-
-function clearFeedback() {
-  statusAlert.textContent = '';
-  statusAlert.style.display = 'none';
+function renderPlaces(places) {
+  map.closePopup();
+  markers.clearLayers();
+  $("places").replaceChildren();
+  for (const place of places) {
+    const marker = L.marker([place.latitude, place.longitude], {
+      icon,
+      title: place.name,
+    })
+      .bindPopup(popup(place), {autoPan:false})
+      .addTo(markers);
+    marker.on("click", () => (activePlace = place.id));
+    if (activePlace === place.id) marker.openPopup();
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "place-card";
+    const symbol = document.createElement("span");
+    symbol.className = "place-symbol";
+    symbol.textContent = "▤";
+    symbol.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    copy.className = "place-copy";
+    const name = document.createElement("strong");
+    name.textContent = place.name;
+    const description = document.createElement("p");
+    description.textContent =
+      place.description || "Um lugar esperando sua próxima visita.";
+    const action = document.createElement("small");
+    action.textContent = "Ver no mapa ↗";
+    copy.append(name, description, action);
+    button.append(symbol, copy);
+    button.addEventListener("click", () => {
+      activePlace = place.id;
+      map.setView(marker.getLatLng(), Math.max(map.getZoom(), 16));
+      marker.openPopup();
+    });
+    const edit = document.createElement("button");
+    edit.type = "button";edit.className = "text-button";edit.textContent = "Editar";
+    edit.setAttribute("aria-label", "Editar local");
+    edit.addEventListener("click", () => openEditor(place));
+    item.append(button, edit);
+    $("places").append(item);
+  }
+  $("result-count").textContent = String(places.length);
+  $("empty-state").hidden = places.length !== 0;
 }
-
-
-function initLeafletMap() {
-  map = L.map('map').setView([DEFAULT_COORDS.lat, DEFAULT_COORDS.lng], DEFAULT_COORDS.zoom);
-
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
-  }).addTo(map);
-
-  placesLayer = L.layerGroup().addTo(map);
-
-  if ('geolocation' in navigator) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        map.setView([latitude, longitude], 15);
-      },
-      (error) => {
-        let msg = 'Geolocalização não disponível. Usando visão padrão.';
-        if (error.code === error.PERMISSION_DENIED) {
-          msg = 'Permissão de localização negada pelo navegador. Usando mapa padrão.';
-        } else if (error.code === error.TIMEOUT) {
-          msg = 'Tempo esgotado ao buscar localização. Usando mapa padrão.';
-        }
-        setFeedback(msg, 'warning');
-      },
-      { timeout: 7000, enableHighAccuracy: true }
+async function loadPlaces() {
+  const current = viewportRequests.next(), version = current.id;
+  $("list-status").textContent = "Buscando locais nesta área…";
+  $("retry").hidden = true;
+  $("empty-state").hidden = true;
+  const timeout = setTimeout(() => current.abort(), 12000);
+  try {
+    const data = await request(
+      buildViewportQuery(map.getBounds()),
+      { signal: current.signal },
     );
-  } else {
-    setFeedback('Navegador sem suporte à geolocalização. Carregando mapa padrão.', 'warning');
+    if (!viewportRequests.isCurrent(version)) return;
+    renderPlaces(data.places);
+    $("list-status").textContent = data.truncated
+      ? "Há mais de 500 locais nesta área. Aproxime o mapa para ver todos."
+      : `${data.places.length === 1 ? "1 local encontrado" : `${data.places.length} locais encontrados`}. Atualizado ao mover o mapa.`;
+  } catch (error) {
+    if (!viewportRequests.isCurrent(version)) return;
+    markers.clearLayers();
+    $("places").replaceChildren();
+    $("result-count").textContent = "—";
+    $("list-status").textContent =
+      error.name === "AbortError"
+        ? "A busca demorou mais que o esperado. Tente novamente."
+        : error.message;
+    $("retry").hidden = false;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  map.on('click', (e) => {
-    updateSelectionPoint(e.latlng.lat, e.latlng.lng);
-  });
-
-  map.on('moveend', loadViewportPlaces);
 }
+map.on("moveend", loadPlaces);
+$("retry").addEventListener("click", loadPlaces);
 
-function updateSelectionPoint(lat, lng) {
-  selectedCoordinates = {
-    lat: Number(lat.toFixed(6)),
-    lng: Number(lng.toFixed(6))
+function locate() {
+  if (!navigator.geolocation) {
+    $("location-status").textContent =
+      "Geolocalização indisponível. Exibindo Fortaleza como ponto de partida; explore o mapa.";
+    return;
+  }
+  $("locate").disabled = true;
+  $("location-status").textContent = "Solicitando sua localização…";
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      userMarker?.remove();
+      userMarker = L.circleMarker([coords.latitude, coords.longitude], {
+        radius: 7,
+        color: "#fff",
+        weight: 3,
+        fillColor: "#377caf",
+        fillOpacity: 1,
+      })
+        .addTo(map)
+        .bindTooltip("Você está aqui");
+      map.setView([coords.latitude, coords.longitude], 15);
+      $("location-status").textContent =
+        "Mapa centralizado na sua localização.";
+      $("locate").disabled = false;
+    },
+    (error) => {
+      const reason =
+        error.code === 1
+          ? "Permissão de localização negada."
+          : geolocationMessage(error.code, window.isSecureContext);
+      $("location-status").textContent =
+        `${reason} Explore o mapa manualmente. A posição inicial alternativa é Fortaleza.`;
+      $("locate").disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+  );
+}
+$("locate").addEventListener("click", locate);
+
+function setPosition(latlng) {
+  if (saving) return;
+  selection = {
+    latitude: latlng.lat,
+    longitude: ((((latlng.lng + 180) % 360) + 360) % 360) - 180,
   };
-
-  coordsDisplay.textContent = `Coordenadas: Lat ${selectedCoordinates.lat}, Lng ${selectedCoordinates.lng}`;
-  saveBtn.disabled = false;
-
-  if (selectionMarker) {
-    selectionMarker.setLatLng([selectedCoordinates.lat, selectedCoordinates.lng]);
-  } else {
-    selectionMarker = L.marker([selectedCoordinates.lat, selectedCoordinates.lng], {
+  if (!selectedMarker) {
+    selectedMarker = L.marker([selection.latitude, selection.longitude], {
       draggable: true,
-      title: 'Ponto selecionado (arraste para ajustar)'
+      title: "Posição do novo local",
     }).addTo(map);
-
-    selectionMarker.on('dragend', (e) => {
-      const pos = e.target.getLatLng();
-      selectedCoordinates = {
-        lat: Number(pos.lat.toFixed(6)),
-        lng: Number(pos.lng.toFixed(6))
-      };
-      coordsDisplay.textContent = `Coordenadas: Lat ${selectedCoordinates.lat}, Lng ${selectedCoordinates.lng}`;
-    });
-  }
+    selectedMarker.on("dragend", () => setPosition(selectedMarker.getLatLng()));
+  } else selectedMarker.setLatLng([selection.latitude, selection.longitude]);
+  $("selected-position").textContent =
+    `${selection.latitude.toFixed(5)}, ${selection.longitude.toFixed(5)} — posição selecionada`;
 }
-
-function clearSelectionPoint() {
-  selectedCoordinates = null;
-  coordsDisplay.textContent = 'Nenhum ponto marcado. Clique no mapa ou busque um endereço acima para posicionar.';
-  saveBtn.disabled = true;
-
-  if (selectionMarker) {
-    map.removeLayer(selectionMarker);
-    selectionMarker = null;
-  }
-}
-
-async function loadViewportPlaces() {
-  if (activeViewportController) {
-    activeViewportController.abort();
-  }
-  activeViewportController = new AbortController();
-
-  const bounds = map.getBounds();
-  const west = bounds.getWest();
-  const east = bounds.getEast();
-  const south = bounds.getSouth();
-  const north = bounds.getNorth();
-
-  const url = `/api/places?west=${west}&east=${east}&south=${south}&north=${north}`;
-
-  try {
-    const res = await fetch(url, { signal: activeViewportController.signal });
-    if (!res.ok) throw new Error(`Erro ${res.status}: falha ao carregar locais.`);
-
-    const data = await res.json();
-
-    if (data.truncated) {
-      setFeedback('Muitos locais nesta área. Aproxime o zoom para visualizar todos.', 'warning');
-    } else {
-      clearFeedback();
-    }
-
-    renderPlaceMarkers(data.places || []);
-  } catch (err) {
-    if (err.name !== 'AbortError') {
-      setFeedback('Falha de conexão com a API de locais.', 'error');
-    }
-  }
-}
-
-function renderPlaceMarkers(places) {
-  placesLayer.clearLayers();
-
-  places.forEach((place) => {
-    const marker = L.marker([place.latitude, place.longitude]);
-
-    const container = document.createElement('div');
-
-    const titleEl = document.createElement('h3');
-    titleEl.style.fontSize = '1rem';
-    titleEl.style.marginBottom = '4px';
-    titleEl.textContent = place.name;
-    container.appendChild(titleEl);
-
-    if (place.description) {
-      const descEl = document.createElement('p');
-      descEl.style.fontSize = '0.85rem';
-      descEl.style.color = '#4b5563';
-      descEl.style.margin = '4px 0 8px';
-      descEl.textContent = place.description;
-      container.appendChild(descEl);
-    }
-
-    const btnContainer = document.createElement('div');
-    btnContainer.style.display = 'flex';
-    btnContainer.style.gap = '6px';
-    btnContainer.style.marginTop = '6px';
-
-    const editBtn = document.createElement('button');
-    editBtn.textContent = 'Editar';
-    editBtn.className = 'btn-secondary';
-    editBtn.style.padding = '3px 8px';
-    editBtn.onclick = () => beginEdit(place);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Excluir';
-    deleteBtn.className = 'btn-danger';
-    deleteBtn.style.padding = '3px 8px';
-    deleteBtn.onclick = () => removePlace(place.id, place.name);
-
-    btnContainer.appendChild(editBtn);
-    btnContainer.appendChild(deleteBtn);
-    container.appendChild(btnContainer);
-
-    marker.bindPopup(container);
-    placesLayer.addLayer(marker);
-  });
-}
-
-function beginEdit(place) {
-  clearFeedback();
-  currentEditingId = place.id;
-  formTitle.textContent = `Editar: ${place.name}`;
-  nameInput.value = place.name;
-  descInput.value = place.description || '';
-  saveBtn.textContent = 'Salvar Alterações';
-  cancelEditBtn.style.display = 'inline-block';
-
-  updateSelectionPoint(place.latitude, place.longitude);
-  map.setView([place.latitude, place.longitude], 16);
-}
-
-function cancelEdit() {
-  currentEditingId = null;
-  formTitle.textContent = 'Cadastrar Local de Estudo';
-  placeForm.reset();
-  saveBtn.textContent = 'Cadastrar';
-  cancelEditBtn.style.display = 'none';
-  clearSelectionPoint();
-  clearFeedback();
-}
-
-cancelEditBtn.addEventListener('click', cancelEdit);
-
-placeForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  clearFeedback();
-
-  if (!selectedCoordinates) {
-    setFeedback('Marque um ponto no mapa ou busque um endereço antes de salvar.', 'error');
+function openEditor(place) {
+  if (saving) return;
+  if (editing && !place) {
+    $("name").focus();
     return;
   }
-
-  saveBtn.disabled = true;
-
-  const payload = {
-    name: nameInput.value.trim(),
-    description: descInput.value.trim(),
-    latitude: selectedCoordinates.lat,
-    longitude: selectedCoordinates.lng
-  };
-
-  const isEditing = Boolean(currentEditingId);
-  const endpoint = isEditing ? `/api/places/${currentEditingId}` : '/api/places';
-  const method = isEditing ? 'PUT' : 'POST';
-
-  try {
-    const res = await fetch(endpoint, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.error || `Erro ${res.status}: Não foi possível salvar o local.`);
-    }
-
-    cancelEdit();
-    await loadViewportPlaces();
-    setFeedback(isEditing ? 'Local atualizado com sucesso!' : 'Local cadastrado com sucesso!', 'info');
-  } catch (err) {
-    setFeedback(err.message, 'error');
-  } finally {
-    saveBtn.disabled = false;
+  editing = true;
+  editingId = place?.id ?? null;
+  $("editor-title").textContent = place ? "Editar local de estudo" : "Um novo ponto de partida.";
+  $("save-place").textContent = place ? "Salvar alterações" : "Salvar local";
+  $("delete-place").hidden = !place;
+  if (place) {
+    $("name").value = place.name;$("description").value = place.description || "";
+    setPosition({lat:place.latitude,lng:place.longitude});
+    map.setView([place.latitude,place.longitude],Math.max(map.getZoom(),15));
   }
-});
-
-async function removePlace(id, name) {
-  const confirmed = window.confirm(`Deseja realmente excluir "${name}"?`);
-  if (!confirmed) return;
-
-  try {
-    const res = await fetch(`/api/places/${id}`, { method: 'DELETE' });
-
-    if (!res.ok && res.status !== 404) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || 'Erro ao excluir o local.');
-    }
-
-    if (currentEditingId === String(id)) {
-      cancelEdit();
-    }
-
-    await loadViewportPlaces();
-    setFeedback('Local removido com sucesso.', 'info');
-  } catch (err) {
-    setFeedback(err.message, 'error');
-  }
+  $("explore-panel").hidden = true;
+  $("editor-panel").hidden = false;
+  document.body.classList.add("selecting");
+  $("map-caption").textContent = "Clique no mapa para marcar o novo local.";
+  $("editor-title").focus();
 }
-
-searchForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  clearFeedback();
-
-  const query = searchInput.value.trim();
-  if (query.length < 3) {
-    setFeedback('Digite ao menos 3 caracteres para buscar o endereço.', 'error');
+function closeEditor() {
+  resetSearch();
+  editingId = null;
+  editing = false;
+  selection = undefined;
+  selectedMarker?.remove();
+  selectedMarker = undefined;
+  $("place-form").reset();
+  $("form-status").textContent = "";
+  $("selected-position").textContent = "Clique no mapa para marcar o local.";
+  $("editor-panel").hidden = true;
+  $("explore-panel").hidden = false;
+  document.body.classList.remove("selecting");
+  $("map-caption").textContent = "Explore o mapa. Encontre seu lugar.";
+  $("new-place").focus();
+}
+$("new-place").addEventListener("click", () => openEditor());
+$("empty-create").addEventListener("click", () => openEditor());
+$("cancel").addEventListener("click", closeEditor);
+$("cancel-top").addEventListener("click", closeEditor);
+$("use-center").addEventListener("click", () => setPosition(map.getCenter()));
+map.on("click", ({ latlng }) => {
+  if (editing) setPosition(latlng);
+});
+$("place-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (saving) return;
+  if (!selection) {
+    $("form-status").textContent =
+      "Selecione um ponto no mapa ou use o centro do mapa.";
+    $("use-center").focus();
     return;
   }
-
-  searchBtn.disabled = true;
-  searchResults.style.display = 'none';
-  searchResults.innerHTML = '';
-
+  if (!$("name").value.trim()) {
+    $("form-status").textContent = "Informe o nome do local.";
+    $("name").focus();
+    return;
+  }
+  const controls = [
+    "save-place",
+    "cancel",
+    "cancel-top",
+    "use-center",
+    "name",
+    "description",
+    "new-place",
+    "delete-place",
+    "search-query",
+    "search-address",
+  ];
+  resetSearch();
+  const wasEditing = editingId !== null;
+  saving = true;
+  selectedMarker?.dragging.disable();
+  controls.forEach((id) => ($(id).disabled = true));
+  $("form-status").textContent = "Salvando seu local…";
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' }
+    await request(editingId ? `/api/places/${encodeURIComponent(editingId)}` : "/api/places", {
+      method: editingId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: $("name").value.trim(),
+        description: $("description").value.trim(),
+        ...selection,
+      }),
+      signal: AbortSignal.timeout(15000),
     });
-
-    if (!res.ok) {
-      throw new Error('Falha no serviço de geocodificação.');
-    }
-
-    const results = await res.json();
-    if (!results || results.length === 0) {
-      setFeedback('Nenhum endereço encontrado para o termo pesquisado.', 'info');
-      return;
-    }
-
-    results.forEach((item) => {
-      const li = document.createElement('li');
-      li.textContent = item.display_name;
-      li.onclick = () => {
-        const lat = parseFloat(item.lat);
-        const lon = parseFloat(item.lon);
-
-        map.setView([lat, lon], 16);
-        updateSelectionPoint(lat, lon);
-        searchResults.style.display = 'none';
-        setFeedback('Ponto posicionado pelo endereço. Preencha os dados e clique em Cadastrar.', 'info');
-      };
-      searchResults.appendChild(li);
-    });
-
-    searchResults.style.display = 'block';
-  } catch (err) {
-    setFeedback('Erro ao consultar endereço. Tente novamente mais tarde.', 'error');
+    const position = [selection.latitude, selection.longitude];
+    closeEditor();
+    map.setView(position, map.getZoom());
+    await loadPlaces();
+    clearTimeout(toastTimer);
+    $("toast").hidden = false;
+    $("toast").textContent = wasEditing ? "Local atualizado com sucesso." : "Local cadastrado. Obrigado por compartilhar!";
+    toastTimer = setTimeout(() => ($("toast").hidden = true), 5000);
+  } catch (error) {
+    $("form-status").textContent =
+      error.name === "TimeoutError"
+        ? "Sem confirmação do salvamento. Confira a lista antes de tentar novamente."
+        : error.message;
   } finally {
-    searchBtn.disabled = false;
+    saving = false;
+    selectedMarker?.dragging.enable();
+    controls.forEach((id) => ($(id).disabled = false));
+    if (!editing) $("new-place").focus();
   }
 });
-
-window.addEventListener('DOMContentLoaded', () => {
-  initLeafletMap();
-  loadViewportPlaces();
+function resetSearch() {
+  ++searchVersion;geocoder.cancel();
+  $("search-address").disabled = false;$("cancel-search").disabled = true;
+  $("search-status").textContent = "";$("search-results").replaceChildren();
+}
+$("address-form").addEventListener("submit",async event => {
+  event.preventDefault();if(saving || geocoder.isSearching()) return;
+  const version = ++searchVersion;
+  $("search-address").disabled = true;$("cancel-search").disabled = false;
+  $("search-results").replaceChildren();$("search-status").textContent = "Buscando endereços…";
+  try {
+    const results = await geocoder.search($("search-query").value);
+    if(version !== searchVersion) return;
+    $("search-status").textContent = results.length ? "Selecione um endereço e revise a posição antes de salvar." : "Nenhum endereço encontrado.";
+    for(const result of results) {
+      const li = document.createElement("li"), button = document.createElement("button");
+      button.type="button";button.className="place-card";button.textContent=result.label;
+      button.addEventListener("click",() => {
+        if(saving) return;
+        setPosition({lat:result.latitude,lng:result.longitude});
+        map.setView([result.latitude,result.longitude],16);
+        $("search-status").textContent="Endereço selecionado. Salve para confirmar o local.";
+      });
+      li.append(button);$("search-results").append(li);
+    }
+  } catch(error) {
+    if(version === searchVersion) $("search-status").textContent=error.message;
+  } finally {
+    if(version === searchVersion) { $("search-address").disabled=false;$("cancel-search").disabled=true; }
+  }
 });
+$("cancel-search").addEventListener("click",() => { resetSearch();$("search-status").textContent="Busca cancelada."; });
+$("delete-place").addEventListener("click",async () => {
+  if(saving || !editingId || !window.confirm(`Deseja realmente excluir "${$("name").value}"?`)) return;
+  resetSearch();saving=true;selectedMarker?.dragging.disable();
+  const controls=["delete-place","save-place","cancel","cancel-top","name","description","use-center","new-place","search-address","search-query"];
+  controls.forEach(id => $(id).disabled=true);
+  try {
+    await request(`/api/places/${encodeURIComponent(editingId)}`,{method:"DELETE",signal:AbortSignal.timeout(15000)});
+    closeEditor();activePlace=null;await loadPlaces();
+    $("toast").textContent="Local excluído com sucesso.";$("toast").hidden=false;
+    clearTimeout(toastTimer);toastTimer=setTimeout(() => $("toast").hidden=true,5000);
+  } catch(error) { $("form-status").textContent=error.message; }
+  finally { saving=false;selectedMarker?.dragging.enable();controls.forEach(id => $(id).disabled=false); }
+});
+loadPlaces();
+locate();

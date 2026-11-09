@@ -1,248 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Locais de Estudo - Mapa Colaborativo</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-      color: #1f2937;
-      background: #f9fafb;
-    }
-
-    #sidebar {
-      width: 420px;
-      min-width: 320px;
-      background: #ffffff;
-      border-right: 1px solid #e5e7eb;
-      display: flex;
-      flex-direction: column;
-      padding: 1.25rem;
-      gap: 1.25rem;
-      overflow-y: auto;
-      z-index: 1000;
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-    }
-
-    #map {
-      flex: 1;
-      height: 100%;
-      width: 100%;
-    }
-
-    .panel {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 1rem;
-    }
-
-    .panel h2 {
-      font-size: 1.05rem;
-      font-weight: 600;
-      margin-bottom: 0.75rem;
-      color: #111827;
-    }
-
-    label {
-      display: block;
-      font-size: 0.825rem;
-      font-weight: 600;
-      margin-bottom: 0.35rem;
-      color: #374151;
-    }
-
-    input[type="text"], textarea {
-      width: 100%;
-      padding: 0.55rem 0.75rem;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      margin-bottom: 0.85rem;
-      background: #fff;
-      font-family: inherit;
-    }
-
-    input[type="text"]:focus, textarea:focus {
-      outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 75px;
-    }
-
-    .coords-badge {
-      font-size: 0.8rem;
-      color: #4b5563;
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      padding: 0.55rem;
-      border-radius: 6px;
-      margin-bottom: 0.85rem;
-      line-height: 1.4;
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    button {
-      cursor: pointer;
-      padding: 0.55rem 0.9rem;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      font-size: 0.875rem;
-      font-weight: 500;
-      transition: background-color 0.15s ease-in-out;
-    }
-
-    .btn-primary { background: #2563eb; color: #ffffff; flex: 1; }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-
-    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
-    .btn-secondary:hover { background: #e5e7eb; }
-
-    .btn-danger { background: #ef4444; color: #ffffff; }
-    .btn-danger:hover { background: #dc2626; }
-
-    .search-row {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    #search-results {
-      list-style: none;
-      max-height: 180px;
-      overflow-y: auto;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      display: none;
-      margin-top: 0.65rem;
-    }
-
-    #search-results li {
-      padding: 0.55rem 0.75rem;
-      font-size: 0.825rem;
-      cursor: pointer;
-      border-bottom: 1px solid #f3f4f6;
-      line-height: 1.35;
-    }
-
-    #search-results li:hover {
-      background: #eff6ff;
-      color: #1d4ed8;
-    }
-
-    #search-results li:last-child {
-      border-bottom: none;
-    }
-
-    #status-alert {
-      padding: 0.75rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      display: none;
-      line-height: 1.4;
-    }
-
-    #status-alert.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-    #status-alert.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-    #status-alert.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
-
-    .attribution-text {
-      font-size: 0.725rem;
-      color: #9ca3af;
-      margin-top: 0.4rem;
-    }
-
-    @media (max-width: 768px) {
-      body { flex-direction: column-reverse; }
-      #sidebar { width: 100%; height: 50vh; min-width: auto; }
-      #map { width: 100%; height: 50vh; }
-    }
-  </style>
-</head>
-<body>
-
-  <aside id="sidebar">
-    <div id="status-alert" role="status" aria-live="polite"></div>
-
-    <section class="panel" aria-labelledby="search-title">
-      <h2 id="search-title">Buscar Localidade ou Endereço</h2>
-      <form id="search-form">
-        <div class="search-row">
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Ex: Biblioteca Municipal ou Campus IFPB..."
-            autocomplete="off"
-          />
-          <button type="submit" id="search-btn" class="btn-secondary">Buscar</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#163d35" />
+    <title>Ponto de Estudo — encontre seu próximo lugar</title>
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script defer src="/vendor/leaflet/leaflet.js"></script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Pular para o conteúdo</a>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Ponto de Estudo, início"
+        ><span class="brand-icon" aria-hidden="true">p.</span
+        ><span
+          >Ponto de Estudo<small>UM BOM LUGAR PARA APRENDER</small></span
+        ></a
+      >
+      <span class="top-caption">Menos distração. Mais descobertas.</span>
+      <button class="primary" id="new-place" type="button">
+        <span aria-hidden="true">＋</span> Novo local
+      </button>
+    </header>
+    <main id="content" class="workspace">
+      <aside class="sidebar" aria-label="Locais de estudo">
+        <section id="explore-panel">
+          <div class="eyebrow">SEU PRÓXIMO CAPÍTULO COMEÇA AQUI</div>
+          <h1>Um lugar para <br />suas ideias.</h1>
+          <p class="intro">
+            Explore bibliotecas, cafés e outros cantinhos para estudar.
+            Compartilhe seus favoritos.
+          </p>
+          <button id="locate" class="location-button" type="button">
+            <span aria-hidden="true">◎</span> Usar minha localização
+          </button>
+          <p id="location-status" class="hint" role="status">
+            Localizando você…
+          </p>
+          <div class="list-heading">
+            <h2>Na área do mapa</h2>
+            <span id="result-count" class="badge">—</span>
+          </div>
+          <p id="list-status" class="hint" role="status">Buscando locais…</p>
+          <button id="retry" class="text-button" type="button" hidden>
+            Tentar novamente
+          </button>
+          <ul
+            id="places"
+            class="places"
+            aria-label="Resultados na área visível"
+          ></ul>
+          <div id="empty-state" class="empty-state" hidden>
+            <span aria-hidden="true">↗</span>
+            <h3>O primeiro ponto pode ser seu.</h3>
+            <p>
+              Nenhum local cadastrado nesta área. Explore o mapa ou compartilhe
+              um lugar que você conhece.
+            </p>
+            <button id="empty-create" class="text-button" type="button">
+              Cadastrar um local →
+            </button>
+          </div>
+        </section>
+        <section id="editor-panel" hidden aria-labelledby="editor-title">
+          <button id="cancel-top" type="button" class="text-button">
+            ← Voltar para explorar
+          </button>
+          <div class="eyebrow editor-eyebrow">COMPARTILHE UMA DESCOBERTA</div>
+          <h1 id="editor-title" tabindex="-1">
+            Um novo ponto <br />de partida.
+          </h1>
+          <p class="intro">
+            Conte para a comunidade onde as ideias fluem melhor.
+          </p>
+          <form id="address-form">
+            <label for="search-query">Buscar endereço</label>
+            <input id="search-query" minlength="3" required placeholder="Ex.: Biblioteca, Fortaleza" autocomplete="off">
+            <button id="search-address" class="text-button" type="submit">Buscar endereço</button>
+            <button id="cancel-search" class="text-button" type="button" disabled>Cancelar busca</button>
+            <p id="search-status" class="hint" role="status"></p>
+            <ul id="search-results" class="places" aria-label="Endereços encontrados"></ul>
+            <p class="hint">Busca por <a href="https://nominatim.org/">Nominatim</a> · © OpenStreetMap contributors.</p>
+          </form>
+          <form id="place-form">
+            <label for="name"
+              >Nome do local <span class="required">*</span></label
+            >
+            <input
+              id="name"
+              name="name"
+              required
+              maxlength="120"
+              placeholder="Ex.: Biblioteca do bairro"
+              autocomplete="off"
+            />
+            <label for="description">O que você encontra por lá?</label>
+            <textarea
+              id="description"
+              name="description"
+              maxlength="2000"
+              rows="4"
+              placeholder="Ambiente, tomadas, silêncio…"
+            ></textarea>
+            <div class="field-label">
+              Localização <span class="required">*</span>
+            </div>
+            <div class="position-box">
+              <span aria-hidden="true">⌖</span>
+              <p id="selected-position">Clique no mapa para marcar o local.</p>
+            </div>
+            <button id="use-center" class="text-button" type="button">
+              Usar o centro do mapa
+            </button>
+            <p class="hint">Arraste o marcador para ajustar a posição.</p>
+            <p id="form-status" class="form-status" role="status"></p>
+            <button id="save-place" class="primary full-width" type="submit">
+              Salvar local
+            </button>
+            <button id="delete-place" class="secondary full-width" type="button" hidden>Excluir local</button>
+            <button id="cancel" class="secondary full-width" type="button">
+              Cancelar
+            </button>
+          </form>
+        </section>
+        <footer class="sidebar-footer">
+          <span class="status-dot" aria-hidden="true"></span> Feito para
+          aprender, juntos.
+        </footer>
+      </aside>
+      <section
+        class="map-section"
+        aria-label="Mapa interativo de locais de estudo"
+      >
+        <div
+          id="map"
+          tabindex="0"
+          aria-label="Mapa. Use as setas para navegar; para cadastrar, use Novo local e Usar o centro do mapa."
+        ></div>
+        <div class="map-caption">
+          <span class="status-dot" aria-hidden="true"></span
+          ><span id="map-caption">Explore o mapa. Encontre seu lugar.</span>
         </div>
-      </form>
-      <ul id="search-results"></ul>
-      <p class="attribution-text">Geocodificação cortesia OpenStreetMap / Nominatim</p>
-    </section>
-
-    <section class="panel" aria-labelledby="form-title">
-      <h2 id="form-title">Cadastrar Local de Estudo</h2>
-      <form id="place-form">
-        <label for="place-name">Nome do local (máx. 120 caracteres)*</label>
-        <input
-          type="text"
-          id="place-name"
-          maxlength="120"
-          required
-          placeholder="Ex: Sala de Estudos 24h"
-        />
-
-        <label for="place-desc">Descrição (máx. 2000 caracteres)</label>
-        <textarea
-          id="place-desc"
-          maxlength="2000"
-          placeholder="Tomadas disponíveis, ar-condicionado, Wi-Fi institucional..."
-        ></textarea>
-
-        <div class="coords-badge" id="coords-display">
-          Nenhum ponto marcado. Clique no mapa ou busque um endereço acima para posicionar.
+        <p id="tile-status" class="tile-status" role="status" hidden></p>
+        <div class="map-note">
+          <span aria-hidden="true">↔</span> Mova o mapa para descobrir outros
+          locais
         </div>
-
-        <div class="btn-row">
-          <button type="submit" id="save-btn" class="btn-primary" disabled>Cadastrar</button>
-          <button type="button" id="cancel-edit-btn" class="btn-secondary" style="display: none;">Cancelar</button>
-        </div>
-      </form>
-    </section>
-  </aside>
-
-  <main id="map" aria-label="Mapa de locais de estudo"></main>
-
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
-  <script src="app.js"></script>
-</body>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
 </html>
