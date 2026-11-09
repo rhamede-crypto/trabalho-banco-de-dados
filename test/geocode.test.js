@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGeocodeClient, createRequestLock } from '../public/app.js';
+import { createGeocodeClient, createRequestLock } from '../public/geocode.js';
 
 test('busca permite cancelamento explícito', async () => {
   let aborted = false;
