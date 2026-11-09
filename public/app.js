@@ -1,3 +1,6 @@
+import { createGeocodeClient } from "./geocode.js";
+const geocoder = createGeocodeClient();
+let editingId = null, searchVersion = 0;
 import { request } from "./api.js";
 import { buildViewportQuery, createRequestLock, geolocationMessage } from "./map-utils.js";
 const viewportRequests = createRequestLock();
@@ -80,7 +83,11 @@ function renderPlaces(places) {
       map.setView(marker.getLatLng(), Math.max(map.getZoom(), 16));
       marker.openPopup();
     });
-    item.append(button);
+    const edit = document.createElement("button");
+    edit.type = "button";edit.className = "text-button";edit.textContent = "Editar";
+    edit.setAttribute("aria-label", "Editar local");
+    edit.addEventListener("click", () => openEditor(place));
+    item.append(button, edit);
     $("places").append(item);
   }
   $("result-count").textContent = String(places.length);
@@ -174,12 +181,22 @@ function setPosition(latlng) {
   $("selected-position").textContent =
     `${selection.latitude.toFixed(5)}, ${selection.longitude.toFixed(5)} — posição selecionada`;
 }
-function openEditor() {
-  if (editing) {
+function openEditor(place) {
+  if (saving) return;
+  if (editing && !place) {
     $("name").focus();
     return;
   }
   editing = true;
+  editingId = place?.id ?? null;
+  $("editor-title").textContent = place ? "Editar local de estudo" : "Um novo ponto de partida.";
+  $("save-place").textContent = place ? "Salvar alterações" : "Salvar local";
+  $("delete-place").hidden = !place;
+  if (place) {
+    $("name").value = place.name;$("description").value = place.description || "";
+    setPosition({lat:place.latitude,lng:place.longitude});
+    map.setView([place.latitude,place.longitude],Math.max(map.getZoom(),15));
+  }
   $("explore-panel").hidden = true;
   $("editor-panel").hidden = false;
   document.body.classList.add("selecting");
@@ -187,6 +204,8 @@ function openEditor() {
   $("editor-title").focus();
 }
 function closeEditor() {
+  resetSearch();
+  editingId = null;
   editing = false;
   selection = undefined;
   selectedMarker?.remove();
@@ -200,8 +219,8 @@ function closeEditor() {
   $("map-caption").textContent = "Explore o mapa. Encontre seu lugar.";
   $("new-place").focus();
 }
-$("new-place").addEventListener("click", openEditor);
-$("empty-create").addEventListener("click", openEditor);
+$("new-place").addEventListener("click", () => openEditor());
+$("empty-create").addEventListener("click", () => openEditor());
 $("cancel").addEventListener("click", closeEditor);
 $("cancel-top").addEventListener("click", closeEditor);
 $("use-center").addEventListener("click", () => setPosition(map.getCenter()));
@@ -230,14 +249,19 @@ $("place-form").addEventListener("submit", async (event) => {
     "name",
     "description",
     "new-place",
+    "delete-place",
+    "search-query",
+    "search-address",
   ];
+  resetSearch();
+  const wasEditing = editingId !== null;
   saving = true;
   selectedMarker?.dragging.disable();
   controls.forEach((id) => ($(id).disabled = true));
   $("form-status").textContent = "Salvando seu local…";
   try {
-    await request("/api/places", {
-      method: "POST",
+    await request(editingId ? `/api/places/${encodeURIComponent(editingId)}` : "/api/places", {
+      method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: $("name").value.trim(),
@@ -252,7 +276,7 @@ $("place-form").addEventListener("submit", async (event) => {
     await loadPlaces();
     clearTimeout(toastTimer);
     $("toast").hidden = false;
-    $("toast").textContent = "Local cadastrado. Obrigado por compartilhar!";
+    $("toast").textContent = wasEditing ? "Local atualizado com sucesso." : "Local cadastrado. Obrigado por compartilhar!";
     toastTimer = setTimeout(() => ($("toast").hidden = true), 5000);
   } catch (error) {
     $("form-status").textContent =
@@ -265,6 +289,51 @@ $("place-form").addEventListener("submit", async (event) => {
     controls.forEach((id) => ($(id).disabled = false));
     if (!editing) $("new-place").focus();
   }
+});
+function resetSearch() {
+  ++searchVersion;geocoder.cancel();
+  $("search-address").disabled = false;$("cancel-search").disabled = true;
+  $("search-status").textContent = "";$("search-results").replaceChildren();
+}
+$("address-form").addEventListener("submit",async event => {
+  event.preventDefault();if(saving || geocoder.isSearching()) return;
+  const version = ++searchVersion;
+  $("search-address").disabled = true;$("cancel-search").disabled = false;
+  $("search-results").replaceChildren();$("search-status").textContent = "Buscando endereços…";
+  try {
+    const results = await geocoder.search($("search-query").value);
+    if(version !== searchVersion) return;
+    $("search-status").textContent = results.length ? "Selecione um endereço e revise a posição antes de salvar." : "Nenhum endereço encontrado.";
+    for(const result of results) {
+      const li = document.createElement("li"), button = document.createElement("button");
+      button.type="button";button.className="place-card";button.textContent=result.label;
+      button.addEventListener("click",() => {
+        if(saving) return;
+        setPosition({lat:result.latitude,lng:result.longitude});
+        map.setView([result.latitude,result.longitude],16);
+        $("search-status").textContent="Endereço selecionado. Salve para confirmar o local.";
+      });
+      li.append(button);$("search-results").append(li);
+    }
+  } catch(error) {
+    if(version === searchVersion) $("search-status").textContent=error.message;
+  } finally {
+    if(version === searchVersion) { $("search-address").disabled=false;$("cancel-search").disabled=true; }
+  }
+});
+$("cancel-search").addEventListener("click",() => { resetSearch();$("search-status").textContent="Busca cancelada."; });
+$("delete-place").addEventListener("click",async () => {
+  if(saving || !editingId || !window.confirm(`Deseja realmente excluir "${$("name").value}"?`)) return;
+  resetSearch();saving=true;selectedMarker?.dragging.disable();
+  const controls=["delete-place","save-place","cancel","cancel-top","name","description","use-center","new-place","search-address","search-query"];
+  controls.forEach(id => $(id).disabled=true);
+  try {
+    await request(`/api/places/${encodeURIComponent(editingId)}`,{method:"DELETE",signal:AbortSignal.timeout(15000)});
+    closeEditor();activePlace=null;await loadPlaces();
+    $("toast").textContent="Local excluído com sucesso.";$("toast").hidden=false;
+    clearTimeout(toastTimer);toastTimer=setTimeout(() => $("toast").hidden=true,5000);
+  } catch(error) { $("form-status").textContent=error.message; }
+  finally { saving=false;selectedMarker?.dragging.enable();controls.forEach(id => $(id).disabled=false); }
 });
 loadPlaces();
 locate();

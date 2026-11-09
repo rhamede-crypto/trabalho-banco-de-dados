@@ -75,6 +75,15 @@
           <p class="intro">
             Conte para a comunidade onde as ideias fluem melhor.
           </p>
+          <form id="address-form">
+            <label for="search-query">Buscar endereço</label>
+            <input id="search-query" minlength="3" required placeholder="Ex.: Biblioteca, Fortaleza" autocomplete="off">
+            <button id="search-address" class="text-button" type="submit">Buscar endereço</button>
+            <button id="cancel-search" class="text-button" type="button" disabled>Cancelar busca</button>
+            <p id="search-status" class="hint" role="status"></p>
+            <ul id="search-results" class="places" aria-label="Endereços encontrados"></ul>
+            <p class="hint">Busca por <a href="https://nominatim.org/">Nominatim</a> · © OpenStreetMap contributors.</p>
+          </form>
           <form id="place-form">
             <label for="name"
               >Nome do local <span class="required">*</span></label
@@ -110,6 +119,7 @@
             <button id="save-place" class="primary full-width" type="submit">
               Salvar local
             </button>
+            <button id="delete-place" class="secondary full-width" type="button" hidden>Excluir local</button>
             <button id="cancel" class="secondary full-width" type="button">
               Cancelar
             </button>

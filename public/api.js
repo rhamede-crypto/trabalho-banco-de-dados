@@ -10,8 +10,9 @@ export function viewportParams(bounds) {
 }
 export async function request(path, options = {}) {
   const response = await fetch(path, options);
-  const data = await response.json();
+  if (response.status === 204) return null;
+  const data = await response.json().catch(() => null);
   if (!response.ok)
-    throw new Error(data.error || "Não foi possível concluir a solicitação.");
+    throw new Error(data?.error || "Não foi possível concluir a solicitação.");
   return data;
 }

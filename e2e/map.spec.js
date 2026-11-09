@@ -202,3 +202,63 @@ test("resposta atrasada não substitui a área atual do mapa", async ({
   release();
   await expect(page.locator(".place-copy strong")).toHaveText("Área atual");
 });
+
+test('edita local existente e atualiza lista', async ({page}) => {
+  let saved;
+  await page.route('**/api/places/1',async route=>{
+    saved=route.request().postDataJSON();
+    await page.route('**/api/places?*',r=>r.fulfill({json:{places:[{id:'1',...saved}],truncated:false}}));
+    await route.fulfill({json:{id:'1',...saved}});
+  });
+  await page.goto('/');
+  await page.getByRole('button',{name:'Editar local',exact:true}).click();
+  await expect(page.getByLabel('Nome do local')).toHaveValue('Biblioteca Central');
+  await page.getByLabel('Nome do local').fill('Biblioteca renovada');
+  await page.getByRole('button',{name:'Salvar alterações'}).click();
+  await expect(page.locator('#toast')).toHaveText('Local atualizado com sucesso.');
+  expect(saved.name).toBe('Biblioteca renovada');
+  await expect(page.locator('.place-copy strong')).toHaveText('Biblioteca renovada');
+});
+
+test('exclusão exige confirmação e remove o local da lista',async({page})=>{
+  let deletes=0;
+  await page.route('**/api/places/1',async route=>{
+    ++deletes;
+    await page.route('**/api/places?*',r=>r.fulfill({json:{places:[],truncated:false}}));
+    await route.fulfill({status:204});
+  });
+  await page.goto('/');await page.getByRole('button',{name:'Editar local',exact:true}).click();
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'Excluir local',exact:true}).click();
+  expect(deletes).toBe(0);
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Excluir local',exact:true}).click();
+  await expect(page.locator('#toast')).toHaveText('Local excluído com sucesso.');
+  await expect(page.locator('#empty-state')).toBeVisible();expect(deletes).toBe(1);
+});
+
+test('busca endereço somente ao enviar e seleciona sem salvar automaticamente',async({page})=>{
+  let searches=0,creates=0;
+  await page.route('**/api/places',r=>{++creates;return r.fulfill({status:201,json:{}});});
+  await page.route('https://nominatim.openstreetmap.org/search?*',r=>{++searches;return r.fulfill({json:[{display_name:'Biblioteca do Centro',lat:'-3.72',lon:'-38.52'}]});});
+  await page.goto('/');await page.getByRole('button',{name:'Novo local'}).click();
+  await page.getByLabel('Buscar endereço', {exact:true}).fill('Biblioteca Fortaleza');
+  expect(searches).toBe(0);
+  await page.getByRole('button',{name:'Buscar endereço',exact:true}).click();
+  await page.getByRole('button',{name:'Biblioteca do Centro',exact:true}).click();
+  await expect(page.locator('#selected-position')).toContainText('-3.72000, -38.52000');
+  expect(searches).toBe(1);expect(creates).toBe(0);
+});
+
+test('busca trata serviço indisponível e nova tentativa',async({page})=>{
+  await page.route('https://nominatim.openstreetmap.org/search?*',r=>r.fulfill({status:503,json:{}}));
+  await page.goto('/');await page.getByRole('button',{name:'Novo local'}).click();
+  await page.getByLabel('Buscar endereço',{exact:true}).fill('Fortaleza');
+  await page.getByRole('button',{name:'Buscar endereço',exact:true}).click();
+  await expect(page.locator('#search-status')).toContainText('indisponível');
+  await page.getByRole('button',{name:'Cancelar',exact:true}).click();
+  await page.getByRole('button',{name:'Novo local'}).click();
+  await page.getByLabel('Buscar endereço',{exact:true}).fill('Fortaleza');
+  await page.getByRole('button',{name:'Buscar endereço',exact:true}).click();
+  await expect(page.locator('#search-status')).not.toHaveText('Buscando endereços…');
+});
