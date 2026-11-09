@@ -22,3 +22,6 @@ Disponibilizar frontend, backend e banco na nuvem, como exige o enunciado.
 
 ## Dependências
 Pode iniciar configuração do banco em paralelo; teste final depende das issues 01–03. Credenciais devem ser adicionadas nas configurações seguras do serviço, nunca em issues ou commits.
+
+## Base de validação já disponível
+A primeira interface e o backend foram testados com PostgreSQL 16/PostGIS 3.5 descartável local. Há testes HTTP, de navegador e de SQL real, com comandos no README e workflow de CI. Isso não substitui a validação do Supabase e do domínio publicado, que permanece nesta tarefa.

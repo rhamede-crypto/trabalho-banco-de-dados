@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#163d35" />
+    <title>Ponto de Estudo — encontre seu próximo lugar</title>
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script defer src="/vendor/leaflet/leaflet.js"></script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Pular para o conteúdo</a>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Ponto de Estudo, início"
+        ><span class="brand-icon" aria-hidden="true">p.</span
+        ><span
+          >Ponto de Estudo<small>UM BOM LUGAR PARA APRENDER</small></span
+        ></a
+      >
+      <span class="top-caption">Menos distração. Mais descobertas.</span>
+      <button class="primary" id="new-place" type="button">
+        <span aria-hidden="true">＋</span> Novo local
+      </button>
+    </header>
+    <main id="content" class="workspace">
+      <aside class="sidebar" aria-label="Locais de estudo">
+        <section id="explore-panel">
+          <div class="eyebrow">SEU PRÓXIMO CAPÍTULO COMEÇA AQUI</div>
+          <h1>Um lugar para <br />suas ideias.</h1>
+          <p class="intro">
+            Explore bibliotecas, cafés e outros cantinhos para estudar.
+            Compartilhe seus favoritos.
+          </p>
+          <button id="locate" class="location-button" type="button">
+            <span aria-hidden="true">◎</span> Usar minha localização
+          </button>
+          <p id="location-status" class="hint" role="status">
+            Localizando você…
+          </p>
+          <div class="list-heading">
+            <h2>Na área do mapa</h2>
+            <span id="result-count" class="badge">—</span>
+          </div>
+          <p id="list-status" class="hint" role="status">Buscando locais…</p>
+          <button id="retry" class="text-button" type="button" hidden>
+            Tentar novamente
+          </button>
+          <ul
+            id="places"
+            class="places"
+            aria-label="Resultados na área visível"
+          ></ul>
+          <div id="empty-state" class="empty-state" hidden>
+            <span aria-hidden="true">↗</span>
+            <h3>O primeiro ponto pode ser seu.</h3>
+            <p>
+              Nenhum local cadastrado nesta área. Explore o mapa ou compartilhe
+              um lugar que você conhece.
+            </p>
+            <button id="empty-create" class="text-button" type="button">
+              Cadastrar um local →
+            </button>
+          </div>
+        </section>
+        <section id="editor-panel" hidden aria-labelledby="editor-title">
+          <button id="cancel-top" type="button" class="text-button">
+            ← Voltar para explorar
+          </button>
+          <div class="eyebrow editor-eyebrow">COMPARTILHE UMA DESCOBERTA</div>
+          <h1 id="editor-title" tabindex="-1">
+            Um novo ponto <br />de partida.
+          </h1>
+          <p class="intro">
+            Conte para a comunidade onde as ideias fluem melhor.
+          </p>
+          <form id="place-form">
+            <label for="name"
+              >Nome do local <span class="required">*</span></label
+            >
+            <input
+              id="name"
+              name="name"
+              required
+              maxlength="120"
+              placeholder="Ex.: Biblioteca do bairro"
+              autocomplete="off"
+            />
+            <label for="description">O que você encontra por lá?</label>
+            <textarea
+              id="description"
+              name="description"
+              maxlength="2000"
+              rows="4"
+              placeholder="Ambiente, tomadas, silêncio…"
+            ></textarea>
+            <div class="field-label">
+              Localização <span class="required">*</span>
+            </div>
+            <div class="position-box">
+              <span aria-hidden="true">⌖</span>
+              <p id="selected-position">Clique no mapa para marcar o local.</p>
+            </div>
+            <button id="use-center" class="text-button" type="button">
+              Usar o centro do mapa
+            </button>
+            <p class="hint">Arraste o marcador para ajustar a posição.</p>
+            <p id="form-status" class="form-status" role="status"></p>
+            <button id="save-place" class="primary full-width" type="submit">
+              Salvar local
+            </button>
+            <button id="cancel" class="secondary full-width" type="button">
+              Cancelar
+            </button>
+          </form>
+        </section>
+        <footer class="sidebar-footer">
+          <span class="status-dot" aria-hidden="true"></span> Feito para
+          aprender, juntos.
+        </footer>
+      </aside>
+      <section
+        class="map-section"
+        aria-label="Mapa interativo de locais de estudo"
+      >
+        <div
+          id="map"
+          tabindex="0"
+          aria-label="Mapa. Use as setas para navegar; para cadastrar, use Novo local e Usar o centro do mapa."
+        ></div>
+        <div class="map-caption">
+          <span class="status-dot" aria-hidden="true"></span
+          ><span id="map-caption">Explore o mapa. Encontre seu lugar.</span>
+        </div>
+        <p id="tile-status" class="tile-status" role="status" hidden></p>
+        <div class="map-note">
+          <span aria-hidden="true">↔</span> Mova o mapa para descobrir outros
+          locais
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

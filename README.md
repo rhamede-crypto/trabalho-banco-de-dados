@@ -1,6 +1,6 @@
 # Locais de estudo
 
-Projeto de Banco de Dados II: mapa colaborativo de bibliotecas, salas e outros locais de estudo. A primeira entrega implementa a API Node.js e o schema PostgreSQL/PostGIS. A interface e a publicação são tarefas da equipe em `docs/issues/`.
+Projeto de Banco de Dados II: mapa colaborativo de bibliotecas, salas e outros locais de estudo. A primeira versão integrada inclui API Node.js, schema PostgreSQL/PostGIS e interface com mapa, geolocalização, consulta por área visível e cadastro de locais. As próximas tarefas da equipe estão em `docs/issues/` e o estado da entrega está em [docs/progresso.md](docs/progresso.md).
 
 ## Executar
 
@@ -14,7 +14,9 @@ npm run db:setup
 npm run dev
 ```
 
-A API usa a porta 3000 por padrão (`PORT` pode alterá-la). `npm start` inicia sem watch; `npm test` executa testes HTTP com banco simulado. Esses testes não substituem validação real de PostGIS. Sem DATABASE_URL, o servidor inicia, mas a API retorna 503 com orientação de configuração. Credenciais ficam somente em `.env` ou nas variáveis do servidor; nunca no frontend. TLS usa a configuração da URL PostgreSQL e a verificação padrão do driver; não desative a verificação de certificados.
+Após iniciar, acesse a aplicação na porta 3000 do servidor. O frontend é servido pelo próprio backend; não precisa de build ou servidor separado. Leaflet é servido pela instalação local e o mapa base usa OpenStreetMap, com atribuição na tela. O carregamento de tiles depende de conexão com o provedor.
+
+A API usa a porta 3000 por padrão (`PORT` pode alterá-la). `npm start` inicia sem watch; `npm test` executa testes HTTP com banco simulado. Há também testes de navegador e de integração com PostGIS real, descritos abaixo. Sem DATABASE_URL, o servidor inicia, mas a API retorna 503 com orientação de configuração. Credenciais ficam somente em `.env` ou nas variáveis do servidor; nunca no frontend. TLS usa a configuração da URL PostgreSQL e a verificação padrão do driver; não desative a verificação de certificados.
 
 `db:setup` cria a extensão, tabela e índices de forma repetível; não apaga dados. A conta de instalação precisa poder criar a extensão. Em produção, use uma conta de aplicação com permissões restritas. Evite editar a tabela manualmente; registre mudanças futuras como migrações.
 
@@ -44,8 +46,8 @@ O banco salva `geography(Point,4326)`; usa ST_DWithin para raio e ST_Intersects 
 ## Divisão sugerida (até quatro integrantes)
 
 1. Backend e modelagem: esta entrega; revisar e validar com PostGIS real.
-2. Frontend: mapa, geolocalização e consulta da área visível.
-3. Cadastro/edição/exclusão e geocodificação, em conjunto com frontend.
+2. Frontend: revisão do mapa entregue e interface de busca por proximidade.
+3. Edição/exclusão e geocodificação, evoluindo o cadastro já entregue.
 4. Banco na nuvem, deploy, testes integrados e roteiro de apresentação.
 
 Todos devem revisar o contrato, fazer commits próprios e compreender o fluxo completo. Nenhuma publicação ou autenticação de usuários foi implementada nesta etapa. A API atual permite escrita sem login; antes de tornar a aplicação pública, definir proteção de abuso e política de acesso na tarefa de publicação.
@@ -63,3 +65,28 @@ O script verifica títulos já existentes antes de criar. Nenhuma atribuição a
 ## Git Flow
 
 Usamos `main` para versões estáveis, `develop` para integração e branches `feature/*`, `release/*` e `hotfix/*` para o trabalho da equipe. Após clonar, execute `bash scripts/setup-git-flow.sh`. Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para criar uma tarefa, abrir PR e publicar versões.
+
+
+## Interface entregue
+
+- Geolocalização solicitada ao abrir; permissão negada ou falha permite explorar o mapa manualmente, com Fortaleza como posição inicial alternativa.
+- Pontos e lista atualizados no `moveend`, por área visível, com cancelamento de requisições antigas e tratamento do limite de 500 resultados.
+- Cadastro com nome, descrição e localização selecionada no mapa, ajustável arrastando o marcador. O botão “Usar o centro do mapa” também permite selecionar sem clicar diretamente no mapa.
+- Mensagens para falhas de rede/banco, ausência de pontos e sucesso no cadastro. Não há dados simulados nem salvamento local no produto; a persistência depende de DATABASE_URL.
+- Layout para desktop e celular; geolocalização em domínio publicado exige HTTPS.
+
+Edição/exclusão pela interface, geocodificação, interface de busca por raio e publicação permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
+
+## Validar
+
+```sh
+npm test
+npx playwright install chromium
+npm run test:e2e
+```
+
+`test:e2e` inicia automaticamente um servidor na porta 3100 e usa API/geolocalização/tiles controlados para verificar sucesso e falhas em desktop e celular. Ele não depende de banco e não valida o serviço externo de mapas. Se o sistema já tiver Chromium, pode usar `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Em máquinas Linux sem dependências de navegador, use `npx playwright install --with-deps chromium`.
+
+Para validar SQL e persistência, configure `TEST_DATABASE_URL` **no ambiente do comando** e execute `npm run test:db`. Use um banco de testes com PostGIS e permissões para criar extensão e schema; o teste cria e remove apenas seu schema temporário. Essa variável não é lida de `.env` pelo script de testes. Não usar o banco de produção.
+
+A integração contínua em `.github/workflows/checks.yml` configura PostGIS e executa os três grupos de testes em pushes e PRs do Git Flow. A execução no GitHub depende de Actions habilitado no repositório.
