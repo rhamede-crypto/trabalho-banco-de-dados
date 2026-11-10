@@ -275,3 +275,65 @@ test('popup do marcador permite iniciar edição e exclusão', async ({page}) =>
   await page.getByRole('button',{name:'Excluir ponto',exact:true}).click();
   await expect(page.getByRole('button',{name:'Excluir local',exact:true})).toBeVisible();
 });
+
+test('proximidade não usa a posição alternativa quando geolocalização é negada',async({page})=>{
+  let radiusRequests=0;
+  page.on('request',r=>{if(new URL(r.url()).searchParams.has('radius')) ++radiusRequests;});
+  await page.goto('/');
+  await expect(page.locator('#location-status')).toContainText('negada');
+  await page.getByRole('button',{name:'Buscar próximos'}).click();
+  await expect(page.locator('#nearby-status')).toContainText('A posição alternativa do mapa não é usada');
+  expect(radiusRequests).toBe(0);
+});
+
+test.describe('busca por proximidade com localização',()=>{
+  test.use({locationAllowed:true});
+  test('consulta 2 km, mantém filtro ao mover mapa e volta ao viewport',async({page})=>{
+    let radiusQuery,viewportRequests=0;
+    await page.route('**/api/places?*',route=>{
+      const query=new URL(route.request().url()).searchParams;
+      if(query.has('radius')) {radiusQuery=Object.fromEntries(query);return route.fulfill({json:{places:[{...place,distance:125}],truncated:false}});}
+      ++viewportRequests;return route.fulfill({json:{places:[place],truncated:false}});
+    });
+    await page.goto('/');await expect(page.locator('#location-status')).toContainText('centralizado');
+    await page.getByRole('button',{name:'Buscar próximos'}).click();
+    await expect(page.locator('.place-copy small')).toContainText('125 m de você');
+    expect(radiusQuery).toEqual({longitude:'-34.9',latitude:'-8.05',radius:'2000'});
+    const previous=viewportRequests;
+    await page.locator('#map').focus();await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#result-title')).toHaveText('Perto de você');
+    expect(viewportRequests).toBe(previous);
+    await page.getByRole('button',{name:'Voltar à área do mapa'}).click();
+    await expect(page.locator('#result-title')).toHaveText('Na área do mapa');
+    await expect.poll(()=>viewportRequests).toBeGreaterThan(previous);
+  });
+  test('trata busca vazia e limite de resultados por raio',async({page})=>{
+    let calls=0;
+    await page.route('**/api/places?*',route=>{
+      const nearby=new URL(route.request().url()).searchParams.has('radius');
+      return route.fulfill({json:nearby ? (++calls===1 ? {places:[],truncated:false} : {places:[{...place,distance:1500}],truncated:true}) : {places:[place],truncated:false}});
+    });
+    await page.goto('/');await expect(page.locator('#location-status')).toContainText('centralizado');
+    await page.getByRole('button',{name:'Buscar próximos'}).click();
+    await expect(page.locator('#empty-title')).toHaveText('Nenhum local neste raio.');
+    await page.getByLabel('Locais perto de você').fill('3');
+    await page.getByRole('button',{name:'Buscar próximos'}).click();
+    await expect(page.locator('#list-status')).toContainText('Reduza o raio');
+    await expect(page.locator('.place-copy small')).toContainText('1,5 km');
+  });
+  test('resposta antiga por raio não substitui área visível após mudar modo',async({page})=>{
+    let release,received=false;
+    const waiting=new Promise(resolve=>release=resolve);
+    await page.route('**/api/places?*',async route=>{
+      if(new URL(route.request().url()).searchParams.has('radius')) {
+        received=true;await waiting;
+        await route.fulfill({json:{places:[{...place,name:'Busca antiga'}],truncated:false}}).catch(()=>{});
+      } else await route.fulfill({json:{places:[place],truncated:false}});
+    });
+    await page.goto('/');await expect(page.locator('#location-status')).toContainText('centralizado');
+    await page.getByRole('button',{name:'Buscar próximos'}).click();await expect.poll(()=>received).toBe(true);
+    await page.getByRole('button',{name:'Voltar à área do mapa'}).click();
+    await expect(page.locator('.place-copy strong')).toHaveText('Biblioteca Central');release();
+    await expect(page.locator('.place-copy strong')).toHaveText('Biblioteca Central');
+  });
+});

@@ -39,8 +39,19 @@
           <p id="location-status" class="hint" role="status">
             Localizando você…
           </p>
+          <form id="nearby-form" class="nearby-form">
+            <label for="radius-km">Locais perto de você</label>
+            <div class="nearby-row">
+              <input id="radius-km" type="number" min="0.001" max="50" step="0.001" value="2" required aria-describedby="radius-help">
+              <span>km</span>
+              <button id="search-nearby" class="primary" type="submit">Buscar próximos</button>
+            </div>
+            <p id="radius-help" class="hint">Raio de até 50 km a partir da sua localização.</p>
+            <p id="nearby-status" class="hint" role="status"></p>
+            <button id="leave-nearby" class="text-button" type="button" hidden>Voltar à área do mapa</button>
+          </form>
           <div class="list-heading">
-            <h2>Na área do mapa</h2>
+            <h2 id="result-title">Na área do mapa</h2>
             <span id="result-count" class="badge">—</span>
           </div>
           <p id="list-status" class="hint" role="status">Buscando locais…</p>
@@ -54,8 +65,8 @@
           ></ul>
           <div id="empty-state" class="empty-state" hidden>
             <span aria-hidden="true">↗</span>
-            <h3>O primeiro ponto pode ser seu.</h3>
-            <p>
+            <h3 id="empty-title">O primeiro ponto pode ser seu.</h3>
+            <p id="empty-description">
               Nenhum local cadastrado nesta área. Explore o mapa ou compartilhe
               um lugar que você conhece.
             </p>
