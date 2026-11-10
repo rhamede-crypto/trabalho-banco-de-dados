@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ponto-de-estudo
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
