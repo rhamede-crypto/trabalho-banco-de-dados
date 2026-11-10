@@ -1,3 +1,5 @@
+import { radiusInMeters, proximityQuery, formatDistance } from "./proximity.js";
+let userPosition = null, proximity = null, radiusCircle;
 import { createGeocodeClient } from "./geocode.js";
 const geocoder = createGeocodeClient();
 let editingId = null, searchVersion = 0;
@@ -87,7 +89,7 @@ function renderPlaces(places) {
     description.textContent =
       place.description || "Um lugar esperando sua próxima visita.";
     const action = document.createElement("small");
-    action.textContent = "Ver no mapa ↗";
+    action.textContent = proximity && Number.isFinite(place.distance) ? `${formatDistance(place.distance)} de você · Ver no mapa ↗` : "Ver no mapa ↗";
     copy.append(name, description, action);
     button.append(symbol, copy);
     button.addEventListener("click", () => {
@@ -104,6 +106,8 @@ function renderPlaces(places) {
   }
   $("result-count").textContent = String(places.length);
   $("empty-state").hidden = places.length !== 0;
+  $("empty-title").textContent = proximity ? "Nenhum local neste raio." : "O primeiro ponto pode ser seu.";
+  $("empty-description").textContent = proximity ? "Aumente o raio da busca ou volte à exploração do mapa." : "Nenhum local cadastrado nesta área. Explore o mapa ou compartilhe um lugar que você conhece.";
 }
 async function loadPlaces() {
   const current = viewportRequests.next(), version = current.id;
@@ -113,14 +117,14 @@ async function loadPlaces() {
   const timeout = setTimeout(() => current.abort(), 12000);
   try {
     const data = await request(
-      buildViewportQuery(map.getBounds()),
+      proximity ? proximityQuery(proximity, proximity.radius) : buildViewportQuery(map.getBounds()),
       { signal: current.signal },
     );
     if (!viewportRequests.isCurrent(version)) return;
     renderPlaces(data.places);
     $("list-status").textContent = data.truncated
-      ? "Há mais de 500 locais nesta área. Aproxime o mapa para ver todos."
-      : `${data.places.length === 1 ? "1 local encontrado" : `${data.places.length} locais encontrados`}. Atualizado ao mover o mapa.`;
+      ? (proximity ? "Há mais de 500 locais neste raio. Reduza o raio para ver todos." : "Há mais de 500 locais nesta área. Aproxime o mapa para ver todos.")
+      : `${data.places.length === 1 ? "1 local encontrado" : `${data.places.length} locais encontrados`}. ${proximity ? "Ordenados pela distância de você." : "Atualizado ao mover o mapa."}`;
   } catch (error) {
     if (!viewportRequests.isCurrent(version)) return;
     markers.clearLayers();
@@ -135,7 +139,7 @@ async function loadPlaces() {
     clearTimeout(timeout);
   }
 }
-map.on("moveend", loadPlaces);
+map.on("moveend", () => { if (!proximity) loadPlaces(); });
 $("retry").addEventListener("click", loadPlaces);
 
 function locate() {
@@ -148,6 +152,7 @@ function locate() {
   $("location-status").textContent = "Solicitando sua localização…";
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
+      userPosition = {latitude:coords.latitude,longitude:coords.longitude};
       userMarker?.remove();
       userMarker = L.circleMarker([coords.latitude, coords.longitude], {
         radius: 7,
@@ -162,6 +167,7 @@ function locate() {
       $("location-status").textContent =
         "Mapa centralizado na sua localização.";
       $("locate").disabled = false;
+      if(proximity) activateProximity(proximity.radius);
     },
     (error) => {
       const reason =
@@ -346,6 +352,30 @@ $("delete-place").addEventListener("click",async () => {
     clearTimeout(toastTimer);toastTimer=setTimeout(() => $("toast").hidden=true,5000);
   } catch(error) { $("form-status").textContent=error.message; }
   finally { saving=false;selectedMarker?.dragging.enable();controls.forEach(id => $(id).disabled=false); }
+});
+function activateProximity(radius) {
+  proximity = {...userPosition, radius};
+  radiusCircle?.remove();
+  radiusCircle = L.circle([proximity.latitude,proximity.longitude],{radius,color:"#163d35",weight:1,fillOpacity:0.08,interactive:false}).addTo(map);
+  $("leave-nearby").hidden = false;
+  $("result-title").textContent = "Perto de você";
+  $("places").setAttribute("aria-label","Resultados por proximidade");
+  $("nearby-status").textContent = `Buscando até ${formatDistance(radius)} da sua localização. Mover o mapa mantém esse filtro.`;
+  map.fitBounds(radiusCircle.getBounds(), {padding:[24,24],maxZoom:16});
+  loadPlaces();
+}
+$("nearby-form").addEventListener("submit",event => {
+  event.preventDefault();
+  if(!userPosition) { $("nearby-status").textContent = "Use minha localização antes de buscar locais próximos. A posição alternativa do mapa não é usada nesta busca.";return; }
+  try { activateProximity(radiusInMeters($("radius-km").value)); }
+  catch(error) { $("nearby-status").textContent = error.message; }
+});
+$("leave-nearby").addEventListener("click",() => {
+  proximity=null;radiusCircle?.remove();radiusCircle=null;
+  $("leave-nearby").hidden=true;$("nearby-status").textContent="";
+  $("result-title").textContent="Na área do mapa";
+  $("places").setAttribute("aria-label","Resultados na área visível");
+  loadPlaces();
 });
 loadPlaces();
 locate();

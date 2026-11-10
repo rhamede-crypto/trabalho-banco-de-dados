@@ -94,7 +94,7 @@ Usamos `main` para versões estáveis, `develop` para integração e branches `f
 - Mensagens para falhas de rede/banco, ausência de pontos e sucesso no cadastro. Não há dados simulados nem salvamento local no produto; a persistência depende de DATABASE_URL.
 - Layout para desktop e celular; geolocalização em domínio publicado exige HTTPS.
 
-Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. Interface de busca por raio e publicação permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
+Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. A busca por raio também está implementada, com controle em quilômetros, distância dos resultados e retorno à área visível. A configuração dos serviços na nuvem, a publicação e a validação do domínio final permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
 
 ## Validar
 
@@ -109,3 +109,8 @@ npm run test:e2e
 Para validar SQL e persistência, configure `TEST_DATABASE_URL` **no ambiente do comando** e execute `npm run test:db`. Use um banco de testes com PostGIS e permissões para criar extensão e schema; o teste cria e remove apenas seu schema temporário. Essa variável não é lida de `.env` pelo script de testes. Não usar o banco de produção.
 
 A integração contínua em `.github/workflows/checks.yml` configura PostGIS e executa os três grupos de testes em pushes e PRs do Git Flow. A execução no GitHub depende de Actions habilitado no repositório.
+
+
+## Publicação (Supabase + Render)
+
+O roteiro completo está em [docs/publicacao.md](docs/publicacao.md). O arquivo render.yaml oferece uma configuração de referência, com frontend e backend no mesmo serviço. A equipe precisa criar os serviços, configurar DATABASE_URL de forma segura, executar o schema e validar a aplicação no domínio HTTPS. Nenhuma conta ou serviço de nuvem foi criado automaticamente.
