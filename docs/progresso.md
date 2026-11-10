@@ -58,6 +58,7 @@ O repositório foi confirmado público. A release 0.1.0 prepara main com todas a
 | Área visível | Aprovado. O pan e o zoom atualizaram a lista. A consulta estreita da API retornou apenas o ponto dentro da área. |
 | Layout | Aprovado em desktop e a 390 px, sem rolagem horizontal. |
 | Reinício do Render | Aprovado. Os dois registros ainda presentes permaneceram no Supabase após reiniciar. Os três registros descartáveis foram removidos ao fim da validação. |
-| Geolocalização concedida e proximidade pela interface | Não testado. Esta sessão não forneceu localização real. A centralização, o raio de 2 km com a posição do usuário, a manutenção do filtro ao mover o mapa e a volta ao modo de área visível aguardam esse teste. |
+| Geolocalização concedida e proximidade pela interface, com origem emulada | Aprovado em verificação adicional no domínio publicado. Chromium recebeu uma posição definida pelo teste; a interface centralizou, buscou 2 km, incluiu o ponto interno e excluiu o externo, manteve o modo ao mover o mapa e voltou à área visível com HTTP 200. Sem erros JavaScript observados. Os dois registros descartáveis foram excluídos com HTTP 204. |
+| Localização física do usuário | Pendente de confirmação manual no celular ou computador do usuário. A origem emulada comprova o fluxo da aplicação, mas não é uma medição da posição física do dispositivo. |
 
 [Repositório público](https://github.com/rhamede-crypto/trabalho-banco-de-dados) · [Aplicação HTTPS](https://ponto-de-estudo.onrender.com/) · [Roteiro de apresentação](apresentacao.md)
