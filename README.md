@@ -1,58 +1,73 @@
-# Locais de estudo
+# Ponto de Estudo
 
-Projeto de Banco de Dados II: mapa colaborativo de bibliotecas, salas e outros locais de estudo. A primeira versão integrada inclui API Node.js, schema PostgreSQL/PostGIS e interface com mapa, geolocalização, consulta por área visível e cadastro de locais. As próximas tarefas da equipe estão em `docs/issues/` e o estado da entrega está em [docs/progresso.md](docs/progresso.md).
+Aplicação web para cadastrar e encontrar locais de estudo em um mapa. Os dados são armazenados em PostgreSQL/PostGIS, com localização espacial e consultas por área visível ou distância.
 
-**Aplicação publicada** · [Ponto de Estudo](https://ponto-de-estudo.onrender.com/)
+**[Acessar aplicação](https://ponto-de-estudo.onrender.com/)** · **[Health check](https://ponto-de-estudo.onrender.com/api/health)**
 
-## Executar
+## Funcionalidades
 
-Requer Node.js 22 ou superior e PostgreSQL com PostGIS (por exemplo, Supabase).
+- Cadastro, consulta, edição e exclusão de locais com nome, descrição e posição no mapa.
+- Geolocalização do navegador, com alternativa manual quando indisponível.
+- Busca de endereços pelo Nominatim, com seleção da posição antes de salvar.
+- Carregamento de locais conforme a área visível do mapa.
+- Busca por raio a partir da localização do usuário, com distâncias e ordenação por proximidade.
+- Layout responsivo, validação de campos e tratamento de falhas de conexão.
+
+## Tecnologias
+
+| Camada | Tecnologias |
+| --- | --- |
+| Interface | HTML, CSS, JavaScript, Leaflet e Fetch API |
+| Mapa e geocodificação | OpenStreetMap e Nominatim |
+| Backend | Node.js, Express e driver PostgreSQL `pg` |
+| Banco | PostgreSQL com PostGIS e índices GiST |
+| Hospedagem | Render para aplicação; Supabase para banco |
+| Verificação | Node.js Test Runner, Playwright e GitHub Actions |
+
+O backend serve a interface e a API no mesmo serviço. O navegador não acessa diretamente o PostgreSQL nem recebe credenciais do banco.
+
+## Executar localmente
+
+Recomenda-se Node.js 24 e um banco PostgreSQL com PostGIS.
 
 ```sh
 npm ci
 cp .env.example .env
-# Preencha DATABASE_URL com a conexão PostgreSQL do seu projeto.
+# Configure DATABASE_URL no arquivo .env.
 npm run db:setup
 npm run dev
 ```
 
-Após iniciar, acesse a aplicação na porta 3000 do servidor. O frontend é servido pelo próprio backend; não precisa de build ou servidor separado. Leaflet é servido pela instalação local e o mapa base usa OpenStreetMap, com atribuição na tela. O carregamento de tiles depende de conexão com o provedor.
+Acesse `http://localhost:3000/`. `PORT` altera a porta; `npm start` inicia sem watch. Sem `DATABASE_URL`, a interface é servida, mas a API retorna 503 indicando que o banco não está configurado.
 
-A API usa a porta 3000 por padrão (`PORT` pode alterá-la). `npm start` inicia sem watch; `npm test` executa testes HTTP com banco simulado. Há também testes de navegador e de integração com PostGIS real, descritos abaixo. Sem DATABASE_URL, o servidor inicia, mas a API retorna 503 com orientação de configuração. Credenciais ficam somente em `.env` ou nas variáveis do servidor; nunca no frontend. TLS usa a configuração da URL PostgreSQL e a verificação padrão do driver; não desative a verificação de certificados.
+`db:setup` instala o schema de [db/schema.sql](db/schema.sql). A operação é repetível e não apaga os registros existentes. Mudanças futuras no schema devem usar migrações apropriadas; o script não atualiza automaticamente uma tabela já criada para qualquer definição nova.
 
-`db:setup` cria a extensão, tabela e índices de forma repetível; não apaga dados. A conta de instalação precisa poder criar a extensão. Em produção, use uma conta de aplicação com permissões restritas. Evite editar a tabela manualmente; registre mudanças futuras como migrações.
+## Estrutura
 
-## Frontend (mapa Leaflet)
+| Caminho | Responsabilidade |
+| --- | --- |
+| `public/` | Interface, mapa e clientes HTTP |
+| `src/server.js` | Inicialização e encerramento do servidor |
+| `src/app.js` | Rotas, consultas SQL e arquivos estáticos |
+| `src/db.js` | Pool de conexões PostgreSQL |
+| `src/validation.js` | Validação dos dados de entrada |
+| `src/setup-db.js` | Aplicação do schema |
+| `db/schema.sql` | Extensão, tabela e índices espaciais |
+| `test/`, `e2e/`, `integration/` | Testes de API, navegador e banco real |
+| `render.yaml` | Configuração de referência da hospedagem |
 
-Com o servidor em execução, abra `http://localhost:3000/` para carregar o mapa. A interface:
+## API
 
-- solicita geolocalização no navegador e usa fallback para Fortaleza (CE) quando não disponível;
-- consulta apenas o retângulo visível em `GET /api/places` no carregamento e ao mover/zoom;
-- informa estado de carregamento, ausência de resultados, falha e resposta truncada.
+`place` tem `id` como string, `name`, `description`, `latitude` e `longitude`.
 
-### Validação manual registrada
-
-Para validar com dois locais reais (Fortaleza):
-
-```sh
-curl -X POST http://localhost:3000/api/places -H 'Content-Type: application/json' -d '{"name":"Biblioteca Pública Estadual do Ceará","description":"Av. Presidente Castelo Branco, 255","latitude":-3.71657,"longitude":-38.53604}'
-curl -X POST http://localhost:3000/api/places -H 'Content-Type: application/json' -d '{"name":"Biblioteca da UFC (Campus do Pici)","description":"Bloco 308, Campus do Pici","latitude":-3.74559,"longitude":-38.57466}'
-```
-
-Depois, abra o mapa em `http://localhost:3000/`, permita geolocalização (ou use fallback), aproxime/afaste e confirme que os marcadores aparecem apenas quando os pontos estão dentro da área visível.
-
-## Contrato da API
-
-`place` representa um local de estudo. Respostas usam `id` como string, `name`, `description`, `latitude` e `longitude`.
-
-| Método | Caminho | Resultado |
+| Método | Caminho | Resposta |
 | --- | --- | --- |
-| GET | `/api/health` | 200 se a tabela está acessível; 503 caso contrário |
+| GET | `/api/health` | 200 se a tabela está acessível; 503 em falha |
 | GET | `/api/places?west=-39&east=-38&south=-4&north=-3` | Locais na área visível |
 | GET | `/api/places?longitude=-38.5&latitude=-3.7&radius=2000` | Locais até 2000 metros, ordenados por distância |
-| POST | `/api/places` | Cria e retorna local (201) |
-| PUT | `/api/places/:id` | Substitui campos do local (200 ou 404) |
-| DELETE | `/api/places/:id` | Remove local (204 ou 404) |
+| POST | `/api/places` | Cria um local, retornando 201 |
+| PUT | `/api/places/:id` | Atualiza um local; 200 ou 404 |
+| DELETE | `/api/places/:id` | Remove um local; 204 ou 404 |
 
 Corpo de POST/PUT:
 
@@ -60,45 +75,13 @@ Corpo de POST/PUT:
 {"name":"Biblioteca Central","description":"Espaço silencioso para estudar","latitude":-3.74,"longitude":-38.57}
 ```
 
-Nome obrigatório com até 120 caracteres; descrição com até 2000. Latitude entre -90 e 90, longitude entre -180 e 180. Raio entre 1 e 50000 metros. Consultas retornam `{ "places": [], "truncated": false }`. Há limite de 500 locais; se `truncated` for true, a interface deve pedir para aproximar o mapa. Na busca por distância, cada local inclui `distance` em metros. A área visível também aceita cruzamento do antimeridiano (`west > east`). Dados inválidos retornam 400; falhas do banco, 503, com `{ "error": "mensagem" }`.
+Nome obrigatório com até 120 caracteres; descrição com até 2000. Latitude entre -90 e 90 e longitude entre -180 e 180. O raio da API é de 1 a 50000 metros; a interface recebe quilômetros. Dados inválidos retornam 400.
 
-O banco salva `geography(Point,4326)`; usa ST_DWithin para raio e ST_Intersects para área visível. Consultas SQL usam parâmetros. Índices GiST atendem geografia e geometria.
+Consultas retornam `{ "places": [], "truncated": false }`. O limite é de 500 locais. Se `truncated` for verdadeiro, aproxime o mapa ou reduza o raio. Na busca por distância, cada local inclui `distance` em metros. A consulta por área também trata o cruzamento do antimeridiano.
 
-## Divisão sugerida (até quatro integrantes)
+O banco mantém `location` como `geography(Point,4326)`. A API extrai coordenadas para renderização, usa `ST_DWithin` para o raio e `ST_Intersects` para a área visível. Consultas SQL usam parâmetros e os índices GiST atendem geografia e a expressão convertida em geometria.
 
-1. Backend e modelagem: esta entrega; revisar e validar com PostGIS real.
-2. Frontend: revisão do mapa entregue e interface de busca por proximidade.
-3. Edição/exclusão e geocodificação, evoluindo o cadastro já entregue.
-4. Banco na nuvem, deploy, testes integrados e roteiro de apresentação.
-
-Todos devem revisar o contrato, fazer commits próprios e compreender o fluxo completo. A API pública aceita cadastro, edição e exclusão sem login durante a demonstração. O backend valida os campos e limita o tamanho das requisições. A proteção contra abuso por volume continua pendente.
-
-## Issues para a equipe
-
-Os quatro escopos estão detalhados em [docs/issues](docs/issues). Para criá-los no GitHub com uma conta autorizada e acesso a api.github.com:
-
-```sh
-bash scripts/create-issues.sh
-```
-
-O script verifica títulos já existentes antes de criar. Nenhuma atribuição a integrantes é feita automaticamente.
-
-## Git Flow
-
-Usamos `main` para versões estáveis, `develop` para integração e branches `feature/*`, `release/*` e `hotfix/*` para o trabalho da equipe. Após clonar, execute `bash scripts/setup-git-flow.sh`. Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para criar uma tarefa, abrir PR e publicar versões.
-
-
-## Interface entregue
-
-- Geolocalização solicitada ao abrir; permissão negada ou falha permite explorar o mapa manualmente, com Fortaleza como posição inicial alternativa.
-- Pontos e lista atualizados no `moveend`, por área visível, com cancelamento de requisições antigas e tratamento do limite de 500 resultados.
-- Cadastro com nome, descrição e localização selecionada no mapa, ajustável arrastando o marcador. O botão “Usar o centro do mapa” também permite selecionar sem clicar diretamente no mapa.
-- Mensagens para falhas de rede/banco, ausência de pontos e sucesso no cadastro. Não há dados simulados nem salvamento local no produto; a persistência depende de DATABASE_URL.
-- Layout para desktop e celular; geolocalização em domínio publicado exige HTTPS.
-
-Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. A busca por raio também está implementada, com controle em quilômetros, distância dos resultados e retorno à área visível.
-
-## Validar
+## Testes
 
 ```sh
 npm test
@@ -106,13 +89,18 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`test:e2e` inicia automaticamente um servidor na porta 3100 e usa API/geolocalização/tiles controlados para verificar sucesso e falhas em desktop e celular. Ele não depende de banco e não valida o serviço externo de mapas. Se o sistema já tiver Chromium, pode usar `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Em máquinas Linux sem dependências de navegador, use `npx playwright install --with-deps chromium`.
+Os testes de navegador iniciam automaticamente um servidor na porta 3100 e usam respostas controladas para API, geolocalização e tiles. Eles não validam o serviço externo de mapas nem substituem os testes no domínio publicado. Em Linux, `npx playwright install --with-deps chromium` também instala dependências necessárias do navegador. Um Chromium existente pode ser selecionado com `CHROMIUM_PATH`.
 
-Para validar SQL e persistência, configure `TEST_DATABASE_URL` **no ambiente do comando** e execute `npm run test:db`. Use um banco de testes com PostGIS e permissões para criar extensão e schema; o teste cria e remove apenas seu schema temporário. Essa variável não é lida de `.env` pelo script de testes. Não usar o banco de produção.
+Para SQL real, forneça `TEST_DATABASE_URL` no ambiente do comando e execute `npm run test:db`. Use um banco de testes com permissão de criar extensão e schema; a suíte cria e remove seu próprio schema temporário. Não execute contra o banco de produção. Essa variável não é carregada de `.env` pelo comando de testes.
 
-A integração contínua em `.github/workflows/checks.yml` configura PostGIS e executa os três grupos de testes em pushes e PRs do Git Flow. A execução no GitHub depende de Actions habilitado no repositório.
+O workflow [checks.yml](.github/workflows/checks.yml) executa testes de API, PostGIS e navegador no GitHub Actions.
 
+## Implantação e operação
 
-## Publicação (Supabase + Render)
+O Render serve interface e backend por HTTPS, e o Supabase mantém o PostgreSQL/PostGIS. Veja [docs/publicacao.md](docs/publicacao.md) para configuração, conexão TLS e diagnóstico.
 
-O Render serve o frontend e a API Node.js no mesmo serviço HTTPS. Os dados ficam no PostgreSQL/PostGIS do Supabase. Consulte o [health check](https://ponto-de-estudo.onrender.com/api/health), o [registro dos testes da publicação](docs/progresso.md), o [guia de publicação](docs/publicacao.md) e o [roteiro de apresentação](docs/apresentacao.md).
+A API permite escrita sem login na configuração atual. Credenciais permanecem no backend, em variáveis de ambiente. A validação de campos e o limite do corpo das requisições não substituem autenticação ou proteção contra abuso por volume.
+
+## Desenvolvimento
+
+As branches permanentes são `main` e `develop`. Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de contribuição e a configuração local do Git Flow.
