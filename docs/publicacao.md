@@ -1,10 +1,10 @@
 # Publicar no Supabase e Render
 
-Este roteiro é uma tarefa real para o integrante responsável pela publicação. Ele deve executar, validar, registrar os resultados e conseguir explicar suas decisões. A configuração pronta não significa que o aplicativo já esteja publicado.
+Este roteiro descreve a publicação da aplicação e os testes no domínio final. A configuração pronta no repositório não comprova que o aplicativo já foi publicado.
 
 ## 1. Preparar a versão
 
-Revisar e integrar o PR de proximidade em develop. Preparar uma release pelo Git Flow e integrar em main após os testes. O arquivo render.yaml usa main como branch de publicação; não apontar para uma versão antiga sem as funcionalidades revisadas. Não criar commits fictícios nem alterar a autoria de alterações feitas por outras pessoas.
+Revisar e integrar o PR de proximidade em develop. Preparar uma release pelo Git Flow e integrar em main após os testes. O arquivo render.yaml usa main como branch de publicação; não apontar para uma versão antiga sem as funcionalidades revisadas.
 
 ## 2. Criar o banco no Supabase
 
