@@ -2,6 +2,8 @@
 
 Projeto de Banco de Dados II: mapa colaborativo de bibliotecas, salas e outros locais de estudo. A primeira versão integrada inclui API Node.js, schema PostgreSQL/PostGIS e interface com mapa, geolocalização, consulta por área visível e cadastro de locais. As próximas tarefas da equipe estão em `docs/issues/` e o estado da entrega está em [docs/progresso.md](docs/progresso.md).
 
+**Aplicação publicada** · [Ponto de Estudo](https://ponto-de-estudo.onrender.com/)
+
 ## Executar
 
 Requer Node.js 22 ou superior e PostgreSQL com PostGIS (por exemplo, Supabase).
@@ -69,7 +71,7 @@ O banco salva `geography(Point,4326)`; usa ST_DWithin para raio e ST_Intersects 
 3. Edição/exclusão e geocodificação, evoluindo o cadastro já entregue.
 4. Banco na nuvem, deploy, testes integrados e roteiro de apresentação.
 
-Todos devem revisar o contrato, fazer commits próprios e compreender o fluxo completo. Nenhuma publicação ou autenticação de usuários foi implementada nesta etapa. A API atual permite escrita sem login; antes de tornar a aplicação pública, definir proteção de abuso e política de acesso na tarefa de publicação.
+Todos devem revisar o contrato, fazer commits próprios e compreender o fluxo completo. A API pública aceita cadastro, edição e exclusão sem login durante a demonstração. O backend valida os campos e limita o tamanho das requisições. A proteção contra abuso por volume continua pendente.
 
 ## Issues para a equipe
 
@@ -94,7 +96,7 @@ Usamos `main` para versões estáveis, `develop` para integração e branches `f
 - Mensagens para falhas de rede/banco, ausência de pontos e sucesso no cadastro. Não há dados simulados nem salvamento local no produto; a persistência depende de DATABASE_URL.
 - Layout para desktop e celular; geolocalização em domínio publicado exige HTTPS.
 
-Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. A busca por raio também está implementada, com controle em quilômetros, distância dos resultados e retorno à área visível. A configuração dos serviços na nuvem, a publicação e a validação do domínio final permanecem para a equipe. As operações correspondentes do backend já estão disponíveis.
+Edição e exclusão pela interface, com confirmação, e geocodificação por busca explícita de endereço já estão integradas. A busca inclui cancelamento, intervalo mínimo de 1,2 segundo e seleção de resultado sem salvamento automático. A busca por raio também está implementada, com controle em quilômetros, distância dos resultados e retorno à área visível.
 
 ## Validar
 
@@ -113,4 +115,4 @@ A integração contínua em `.github/workflows/checks.yml` configura PostGIS e e
 
 ## Publicação (Supabase + Render)
 
-O roteiro completo está em [docs/publicacao.md](docs/publicacao.md). O arquivo render.yaml oferece uma configuração de referência, com frontend e backend no mesmo serviço. A equipe precisa criar os serviços, configurar DATABASE_URL de forma segura, executar o schema e validar a aplicação no domínio HTTPS. Nenhuma conta ou serviço de nuvem foi criado automaticamente.
+O Render serve o frontend e a API Node.js no mesmo serviço HTTPS. Os dados ficam no PostgreSQL/PostGIS do Supabase. Consulte o [health check](https://ponto-de-estudo.onrender.com/api/health), o [registro dos testes da publicação](docs/progresso.md), o [guia de publicação](docs/publicacao.md) e o [roteiro de apresentação](docs/apresentacao.md).
