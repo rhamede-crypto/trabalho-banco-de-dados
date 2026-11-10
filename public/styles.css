@@ -31,7 +31,8 @@ textarea {
 button,
 a,
 input,
-textarea {
+textarea,
+summary {
   touch-action: manipulation;
 }
 button {
@@ -45,6 +46,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
+summary:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid #668a28;
   outline-offset: 4px;
@@ -158,6 +160,36 @@ h1 {
   line-height: 1.75;
   color: var(--muted);
   margin-bottom: 25px;
+}
+.how-to-use {
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f2f4ec;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.how-to-use summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--green);
+  font-size: 13px;
+  border-radius: 4px;
+}
+.how-to-use-list {
+  margin: 10px 0 2px;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.65;
+  display: grid;
+  gap: 8px;
+}
+.how-to-use-list strong,
+.how-to-use-list em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 650;
 }
 .location-button {
   background: #edf1e6;

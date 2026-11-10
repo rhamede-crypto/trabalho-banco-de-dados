@@ -337,3 +337,26 @@ test.describe('busca por proximidade com localização',()=>{
     await expect(page.locator('.place-copy strong')).toHaveText('Biblioteca Central');
   });
 });
+
+test('seção Como usar abre e fecha por teclado e clique com instruções completas', async ({ page }) => {
+  await page.goto('/');
+  const details = page.locator('details.how-to-use');
+  const summary = details.locator('summary', { hasText: 'Como usar' });
+  const list = details.locator('.how-to-use-list');
+
+  await expect(summary).toBeVisible();
+  await expect(list).toBeHidden();
+
+  await summary.focus();
+  await page.keyboard.press('Enter');
+  await expect(list).toBeVisible();
+  await expect(list).toContainText('Usar minha localização');
+  await expect(list).toContainText('Novo local');
+  await expect(list).toContainText('Buscar próximos');
+  await expect(list).toContainText('Buscar endereço');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+  await summary.click();
+  await expect(list).toBeHidden();
+});
+
