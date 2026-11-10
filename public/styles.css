@@ -335,23 +335,6 @@ h1 {
   gap: 8px;
   pointer-events: none;
 }
-.map-note {
-  position: absolute;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 11px 18px;
-  border-radius: 100px;
-  background: #fffffff2;
-  box-shadow: 0 2px 14px #203b3510;
-  font-size: 11px;
-  color: #5d6e5d;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.map-note span {
-  padding-right: 8px;
-}
 .tile-status {
   position: absolute;
   z-index: 501;
@@ -533,9 +516,6 @@ textarea {
     font-size: 10px;
     left: 12px;
     top: 12px;
-  }
-  .map-note {
-    display: none;
   }
 }
 @media (max-width: 600px) {
